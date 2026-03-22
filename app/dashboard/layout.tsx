@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3, Lightbulb, Settings } from "lucide-react";
+import { Shield, LayoutDashboard, PlusCircle, History, LogOut, Wallet, User, Lock, Menu, X, BarChart3, Lightbulb, Settings, Trophy } from "lucide-react";
 import { useDisconnect, useAccount } from "wagmi";
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
@@ -117,23 +117,25 @@ function MotivationalHeader() {
 function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
     return (
         <>
-            <Link href="/" onClick={onNavigate}>
-                <div className="h-20 flex items-center gap-3 px-6 border-b border-white/5">
-                    <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
-                        <Image
-                            src="/logo3.png"
-                            alt="Savique Logo"
-                            fill
-                            className="object-contain"
-                        />
+            <div className="flex-shrink-0">
+                <Link href="/" onClick={onNavigate}>
+                    <div className="h-20 flex items-center gap-3 px-6 border-b border-white/5">
+                        <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+                            <Image
+                                src="/logo3.png"
+                                alt="Savique Logo"
+                                fill
+                                className="object-contain"
+                            />
+                        </div>
+                        <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                            Savique
+                        </span>
                     </div>
-                    <span className="text-xl font-bold font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                        Savique
-                    </span>
-                </div>
-            </Link>
+                </Link>
+            </div>
 
-            <nav className="flex-1 px-4 py-8 space-y-2">
+            <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto no-scrollbar">
                 <p className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Menu</p>
                 <div className="flex flex-col gap-2">
                     <NavItem
@@ -172,6 +174,13 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                         onClick={onNavigate}
                     />
                     <NavItem
+                        href="/dashboard/leaderboard"
+                        icon={<Trophy className="w-5 h-5" />}
+                        label="Leaderboard"
+                        active={pathname.startsWith("/dashboard/leaderboard")}
+                        onClick={onNavigate}
+                    />
+                    <NavItem
                         href="/dashboard/tips"
                         icon={<Lightbulb className="w-5 h-5" />}
                         label="Savings Tips"
@@ -188,7 +197,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
                 </div>
             </nav>
 
-            <div className="p-4 border-t border-white/10">
+            <div className="p-4 border-t border-white/10 flex-shrink-0">
                 {/* Mobile-only wallet connect info */}
                 <div className="md:hidden mb-4">
                     <ConnectButton
@@ -257,7 +266,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </AnimatePresence>
 
             {/* Main Wrapper */}
-            <div className="flex-1 md:ml-64 flex flex-col min-h-screen transition-all duration-300">
+            <div className="md:pl-64 flex flex-col min-h-screen w-full transition-all duration-300">
                 {/* Header */}
                 <header className="h-20 border-b border-white/10 glass sticky top-0 z-10 px-4 md:px-8 flex items-center justify-between">
                     <div className="flex items-center gap-4 flex-1 mr-4">
