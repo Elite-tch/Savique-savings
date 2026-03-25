@@ -104,8 +104,11 @@ export default function Dashboard() {
                         console.warn("Failed to fetch chain vaults", err);
                     }
 
-                    // 3. Merge
-                    const uniqueVaults = Array.from(new Set([...dbVaults, ...chainVaults]));
+                    // 3. Merge and normalize to lowercase to prevent deduplication failure (Checksum vs Lowercase)
+                    const uniqueVaults = Array.from(new Set([
+                        ...dbVaults.map(v => v.toLowerCase()),
+                        ...chainVaults.map(v => v.toLowerCase())
+                    ]));
                     setVaultAddresses(uniqueVaults);
 
                     // 4. Backfill (Fire & Forget)
@@ -300,12 +303,12 @@ export default function Dashboard() {
             <div className="flex justify-between md:flex-row flex-col gap-3 md:items-center">
                 <h2 className="text-2xl font-bold text-white">Recent Savings</h2>
                 <div className="flex md:flex-row flex-col gap-4 md:items-center">
-                   <div className=" flex justify-end"> 
-                    <Link href="/dashboard/savings">
-                        <Button variant="ghost" className="text-gray-400 hover:text-white">
-                            View All
-                        </Button>
-                    </Link>
+                    <div className=" flex justify-end">
+                        <Link href="/dashboard/savings">
+                            <Button variant="ghost" className="text-gray-400 hover:text-white">
+                                View All
+                            </Button>
+                        </Link>
                     </div>
                     <Link href="/dashboard/create">
                         <Button className="gap-2 bg-primary text-white hover:bg-primary/90">

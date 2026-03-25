@@ -67,7 +67,7 @@ export default function LandingPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
                     >
-                         <h1 className="text-3xl md:text-7xl font-bold  mb-6 tracking-tigh  text-white">
+                        <h1 className="text-3xl md:text-7xl font-bold  mb-6 tracking-tigh  text-white">
                             Save With Purpose, <br />
                             <span className="text-primary glow ">Achieve With Ease.</span>
                         </h1>
@@ -98,15 +98,15 @@ export default function LandingPage() {
                         className="relative"
                     >
                         <div className="hidden md:block">
- <InteractiveMockDashboard />
+                            <InteractiveMockDashboard />
                         </div>
-                       
+
 
                         {/* Floating Labels / Steps */}
                         <div className="grid md:grid-cols-3 gap-6 mt-16 bg-zinc-900/40 p-4 md:p-10 rounded-[2.5rem] border border-white/5 md:w-[95%] mx-auto backdrop-blur-xl shadow-2xl relative">
-                            <motion.div 
-                                whileHover={{ 
-                                    backgroundColor: "rgba(230, 32, 88, 0.05)", 
+                            <motion.div
+                                whileHover={{
+                                    backgroundColor: "rgba(230, 32, 88, 0.05)",
                                     borderColor: "rgba(230, 32, 88, 0.4)",
                                     boxShadow: "0 10px 30px -10px rgba(230, 32, 88, 0.1)"
                                 }}
@@ -118,9 +118,9 @@ export default function LandingPage() {
                                 <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Select a savings category and set your maturity date.</p>
                             </motion.div>
 
-                            <motion.div 
-                                whileHover={{ 
-                                    backgroundColor: "rgba(230, 32, 88, 0.05)", 
+                            <motion.div
+                                whileHover={{
+                                    backgroundColor: "rgba(230, 32, 88, 0.05)",
                                     borderColor: "rgba(230, 32, 88, 0.4)",
                                     boxShadow: "0 10px 30px -10px rgba(230, 32, 88, 0.1)"
                                 }}
@@ -132,9 +132,9 @@ export default function LandingPage() {
                                 <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Deploy funds into your non-custodial vault on Flare.</p>
                             </motion.div>
 
-                            <motion.div 
-                                whileHover={{ 
-                                    backgroundColor: "rgba(230, 32, 88, 0.05)", 
+                            <motion.div
+                                whileHover={{
+                                    backgroundColor: "rgba(230, 32, 88, 0.05)",
                                     borderColor: "rgba(230, 32, 88, 0.4)",
                                     boxShadow: "0 10px 30px -10px rgba(230, 32, 88, 0.1)"
                                 }}
