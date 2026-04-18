@@ -44,6 +44,16 @@ A visual command center for tracking Total Value Locked (TVL) and wealth traject
 *   **Proof of Reserves**: Real-time transparency of all capital secured by the protocol.
 *   **Audit Distribution**: Categorized view of all financial proofs and receipts.
 
+### 6. The Yield-Sharing Engine
+Every dollar saved is now productive capital earning Aave V3 yield.
+*   **Protocol Yield Split**: 80% to User / 20% to Savique Treasury.
+*   **On-Chain Realism**: Subtraction-based math (Total Balance - Principal) instead of simulated APY assumptions.
+
+### 7. Tradeable Savings NFTs
+Each savings vault is represented as a unique, tradeable NFT. If a user needs liquidity before maturity, they can sell their "Savings NFT" on the open market instead of breaking the vault early.
+*   **Protocol Royalty**: 2.5% on every secondary market trade.
+*   **Dynamic Visuals**: NFT metadata visibly displays your "Goal" (e.g. Car, House) and the current value.
+
 ---
 
 ## 🏗️ Technical Stack
@@ -59,7 +69,6 @@ A visual command center for tracking Total Value Locked (TVL) and wealth traject
 
 1.  **Install Dependencies**: `npm install`
 2.  **Environment Setup**:
-    *   `NEXT_PUBLIC_PROOFRAILS_KEY`: For audit signatures.
     *   `FIREBASE_CONFIG`: For persistence and profiles.
     *   `RESEND_API_KEY`: For professional email notifications.
 3.  **Launch**: `npm run dev`
