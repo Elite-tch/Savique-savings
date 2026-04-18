@@ -207,6 +207,7 @@ export interface SavedVault {
     purpose?: string;
     targetAmount?: string; // New: Sinking Fund Goal
     beneficiary?: string; // Emergency Beneficiary
+    vaultId?: number; // Support for NFT Vault IDs
 }
 
 import { ensureUserExists } from './userService';

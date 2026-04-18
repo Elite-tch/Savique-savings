@@ -18,7 +18,7 @@ import {
     ExternalLink
 } from "lucide-react";
 import { usePublicClient } from "wagmi";
-import { VAULT_ABI } from "@/lib/contracts";
+import { VAULT_ABI, CONTRACTS } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -56,8 +56,8 @@ export default function AdminDashboard() {
         setRefreshing(true);
         try {
             const [allVaults, allReceipts] = await Promise.all([
-                getAllVaults(),
-                getAllReceipts()
+                getAllVaults(CONTRACTS.arbitrumSepolia.VaultFactory),
+                getAllReceipts(CONTRACTS.arbitrumSepolia.VaultFactory)
             ]);
 
             setVaults(allVaults);

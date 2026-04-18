@@ -21,8 +21,9 @@ const FACTORY_ABI = [
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    props: { params: Promise<{ id: string }> }
 ) {
+    const params = await props.params;
     const tokenId = params.id;
 
     try {
@@ -53,6 +54,7 @@ export async function GET(
         ]);
 
         const formattedBalance = parseFloat(formatUnits(balance as bigint, 6)).toFixed(2);
+        const purposeStr = purpose as string;
 
         // 3. Generate a beautiful dynamic SVG
         const svg = `
@@ -62,7 +64,7 @@ export async function GET(
                 
                 <text x="50%" y="100" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="Arial" font-size="24" font-weight="bold">SAVIQUE VAULT #${tokenId}</text>
                 
-                <text x="50%" y="220" dominant-baseline="middle" text-anchor="middle" fill="#FF1E56" font-family="Arial" font-size="40" font-weight="black">${purpose.toUpperCase()}</text>
+                <text x="50%" y="220" dominant-baseline="middle" text-anchor="middle" fill="#FF1E56" font-family="Arial" font-size="40" font-weight="black">${purposeStr.toUpperCase()}</text>
                 
                 <rect x="100" y="280" width="300" height="80" rx="15" fill="#1A1A1A"/>
                 <text x="50%" y="315" dominant-baseline="middle" text-anchor="middle" fill="#888" font-family="Arial" font-size="14">CURRENT BALANCE</text>
@@ -84,11 +86,11 @@ export async function GET(
 
         // 4. Return Metadata
         return NextResponse.json({
-            name: `Savique Vault #${tokenId}: ${purpose}`,
-            description: `This NFT represents a secure savings vault on the Savique Protocol. Purpose: ${purpose}. The holder of this NFT owns the assets inside the vault.`,
+            name: `Savique Vault #${tokenId}: ${purposeStr}`,
+            description: `This NFT represents a secure savings vault on the Savique Protocol. Purpose: ${purposeStr}. The holder of this NFT owns the assets inside the vault.`,
             image: imageUri,
             attributes: [
-                { trait_type: "Purpose", value: purpose },
+                { trait_type: "Purpose", value: purposeStr },
                 { trait_type: "Balance", value: `${formattedBalance} USDC` },
                 { trait_type: "Vault ID", value: tokenId },
             ],

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getAllReceipts, Receipt } from "@/lib/receiptService";
+import { CONTRACTS } from "@/lib/contracts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +28,7 @@ export default function CompletedGoalsPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const r = await getAllReceipts();
+                const r = await getAllReceipts(CONTRACTS.arbitrumSepolia.VaultFactory);
                 setReceipts(r.filter(item => item.type === 'completed'));
             } catch (e) {
                 toast.error("Failed to load completed goals");

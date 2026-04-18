@@ -198,29 +198,7 @@ export default function SettingsPage() {
                             </Button>
                         </form>
 
-                        {/* Test Email Button */}
-                        <div className="mt-4 pt-4 border-t border-white/5">
-                            <p className="text-xs text-zinc-500 mb-3">Once you've saved your email, click below to verify it's working:</p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                disabled={testingEmail || !email}
-                                onClick={handleTestEmail}
-                                className="w-full h-11 border-zinc-700 hover:bg-white/5 text-zinc-300 font-semibold rounded-xl flex items-center justify-center gap-2"
-                            >
-                                {testingEmail ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Sending Test...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Send className="w-4 h-4" />
-                                        Send Test Email
-                                    </>
-                                )}
-                            </Button>
-                        </div>
+                       
                     </Card>
                 </div>
 
@@ -251,9 +229,14 @@ export default function SettingsPage() {
                         <p className="text-xs text-zinc-500 mb-4 tracking-tight">
                             If you're not receiving emails, check your spam folder or ensure your SMTP settings are correct.
                         </p>
-                        <Button variant="outline" className="w-full text-xs font-bold border-zinc-800 hover:bg-white/5 text-zinc-400">
-                            Contact Support
-                        </Button>
+                        <a href="mailto:savique.contact@gmail.com" className="w-full block">
+                            <Button 
+                                variant="outline" 
+                                className="w-full text-xs font-bold border-zinc-800 hover:bg-white/5 text-zinc-400"
+                            >
+                                Contact Support
+                            </Button>
+                        </a>
                     </Card>
                 </div>
             </div>

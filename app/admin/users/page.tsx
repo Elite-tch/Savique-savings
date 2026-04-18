@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { getAllVaults, getAllReceipts, Receipt, SavedVault } from "@/lib/receiptService";
+import { CONTRACTS } from "@/lib/contracts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,7 @@ export default function UsersPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const [v, r] = await Promise.all([getAllVaults(), getAllReceipts()]);
+                const [v, r] = await Promise.all([getAllVaults(CONTRACTS.arbitrumSepolia.VaultFactory), getAllReceipts(CONTRACTS.arbitrumSepolia.VaultFactory)]);
                 setVaults(v);
                 setReceipts(r);
             } catch (e) {
