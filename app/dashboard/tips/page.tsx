@@ -76,25 +76,25 @@ const TIPS = [
     }
 ];
 
-const FLARE_OPPORTUNITIES = [
+const ARBITRUM_OPPORTUNITIES = [
     {
-        title: "FTSO Delegation",
-        description: "Delegate your FLR tokens to Flare Time Series Oracle providers to earn 7-10% APR. No lockup required.",
-        link: "https://portal.flare.network/",
-        difficulty: "Beginner",
+        title: "GMX Staking",
+        description: "Stake GMX or GLP on the leading decentralized exchange on Arbitrum to earn high interest in ETH and GMX.",
+        link: "https://gmx.io/",
+        difficulty: "Intermediate",
         icon: <Zap className="w-4 h-4" />
     },
     {
-        title: "Liquidity Provision",
-        description: "Provide liquidity to Flare DEXes (Enosys, SparkDEX) to earn trading fees. Best for users with $500+ capital.",
-        link: "https://enosys.global/",
-        difficulty: "Intermediate",
+        title: "Aave Lending",
+        description: "Supply your assets to Aave on Arbitrum to earn interest and participate in decentralized lending protocols.",
+        link: "https://app.aave.com/",
+        difficulty: "Beginner",
         icon: <DollarSign className="w-4 h-4" />
     },
     {
-        title: "Testnet Participation",
-        description: "Test new Flare protocols on Coston2. Early testers often receive airdrops or governance tokens.",
-        link: "https://flare.network/ecosystem/",
+        title: "Arbitrum Portal",
+        description: "Explore the vast ecosystem of dApps, games, and infrastructure built on the Arbitrum network.",
+        link: "https://portal.arbitrum.io/",
         difficulty: "Beginner",
         icon: <Wallet className="w-4 h-4" />
     }
@@ -167,7 +167,7 @@ export default function SavingsTipsPage() {
                 ))}
             </div>
 
-            {/* Flare Ecosystem Opportunities */}
+            {/* Arbitrum Ecosystem Opportunities */}
             <motion.section
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -175,15 +175,15 @@ export default function SavingsTipsPage() {
                 className="space-y-10 pt-10"
             >
                 <div className="flex items-center gap-6">
-                    <h2 className="text-3xl font-bold text-white whitespace-nowrap text-primary glow">Earn on Flare</h2>
+                    <h2 className="text-3xl font-bold text-white whitespace-nowrap text-primary glow">Earn on Arbitrum</h2>
                     <div className="h-[1px] w-full bg-gradient-to-r from-white/10 via-primary/5 to-transparent" />
                 </div>
                 <p className="text-gray-400 text-lg leading-relaxed">
-                    Legitimate ways to earn additional income within the Flare ecosystem. These earnings can be locked directly into your Savings for compounding growth.
+                    Legitimate ways to earn additional income within the Arbitrum ecosystem. These earnings can be locked directly into your Savings for compounding growth.
                 </p>
 
                 <div className="grid gap-6">
-                    {FLARE_OPPORTUNITIES.map((opp, i) => (
+                    {ARBITRUM_OPPORTUNITIES.map((opp, i) => (
                         <motion.div
                             key={i}
                             whileHover={{

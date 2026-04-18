@@ -107,7 +107,7 @@ export default function CompletedGoalsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2 text-[10px]">
-                                                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => window.open(`https://coston2-explorer.flare.network/tx/${receipt.txHash}`, '_blank')}>
+                                                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => window.open(`https://sepolia.arbiscan.io/tx/${receipt.txHash}`, '_blank')}>
                                                     <ExternalLink size={12} /> TX
                                                 </Button>
                                             </div>

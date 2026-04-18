@@ -15,58 +15,18 @@ import {
     ledgerWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { WagmiProvider, createConfig } from 'wagmi';
-import { defineChain } from "viem";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "viem";
 import { Toaster } from "sonner";
 import { AutoDisconnect } from "@/components/AutoDisconnect";
-
-export const flare = defineChain({
-    id: 14,
-    name: "Flare Mainnet",
-    nativeCurrency: {
-        decimals: 18,
-        name: "Flare",
-        symbol: "FLR",
-    },
-    rpcUrls: {
-        default: { http: ["https://flare-api.flare.network/ext/C/rpc"] },
-    },
-    blockExplorers: {
-        default: { name: "Flare Explorer", url: "https://flare-explorer.flare.network" },
-    },
-});
-
-export const flareCoston2 = defineChain({
-    id: 114,
-    name: "Coston2",
-    nativeCurrency: {
-        decimals: 18,
-        name: "C2FLR",
-        symbol: "C2FLR",
-    },
-    rpcUrls: {
-        default: {
-            http: [
-                "https://coston2-api.flare.network/ext/C/rpc",
-                "https://flare-testnet-coston2.rpc.thirdweb.com",
-                "https://coston2.enosys.global/ext/C/rpc",
-                "https://rpc.ankr.com/flare_coston2"
-            ]
-        },
-    },
-    blockExplorers: {
-        default: { name: "Coston2 Explorer", url: "https://coston2-explorer.flare.network" },
-    },
-    testnet: true,
-});
+import { arbitrum, arbitrumSepolia } from "viem/chains";
 
 const projectId = 'd76edd2ec72490269459a792d70e84fc';
 
 const connectors = connectorsForWallets(
     [
         {
-            groupName: 'Flare Ecosystem',
+            groupName: 'Arbitrum Ecosystem',
             wallets: [
                 bifrostWallet,
                 walletConnectWallet,
@@ -90,15 +50,15 @@ const connectors = connectorsForWallets(
 
 export const wagmiConfig = createConfig({
     connectors,
-    chains: [flareCoston2, flare],
+    chains: [arbitrumSepolia, arbitrum],
     transports: {
-        [flareCoston2.id]: http(undefined, {
+        [arbitrumSepolia.id]: http(undefined, {
             batch: true,
             timeout: 60_000,
             retryCount: 5,
             retryDelay: 2000,
         }),
-        [flare.id]: http(undefined, {
+        [arbitrum.id]: http(undefined, {
             batch: true,
             timeout: 60_000,
             retryCount: 5,

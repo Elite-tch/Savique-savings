@@ -3,20 +3,20 @@
 import { useState, useEffect } from "react";
 import { CONTRACTS } from "@/lib/contracts";
 
-const STORAGE_KEY_USDT = "safevault_usdt_address";
-const STORAGE_KEY_FACTORY = "safevault_factory_address";
+const STORAGE_KEY_USDC = "savique_usdc_address_v11";
+const STORAGE_KEY_FACTORY = "savique_factory_address_v11";
 
 export function useContractAddresses() {
-    const [usdtAddress, setUsdtAddress] = useState<`0x${string}`>(CONTRACTS.coston2.USDTToken);
-    const [factoryAddress, setFactoryAddress] = useState<`0x${string}`>(CONTRACTS.coston2.VaultFactory);
+    const [usdtAddress, setUsdtAddress] = useState<`0x${string}`>(CONTRACTS.arbitrumSepolia.USDCToken);
+    const [factoryAddress, setFactoryAddress] = useState<`0x${string}`>(CONTRACTS.arbitrumSepolia.VaultFactory);
     const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
-        const storedUSDT = localStorage.getItem(STORAGE_KEY_USDT);
+        const storedUSDC = localStorage.getItem(STORAGE_KEY_USDC);
         const storedFactory = localStorage.getItem(STORAGE_KEY_FACTORY);
 
-        if (storedUSDT && storedUSDT.startsWith("0x")) {
-            setUsdtAddress(storedUSDT as `0x${string}`);
+        if (storedUSDC && storedUSDC.startsWith("0x")) {
+            setUsdtAddress(storedUSDC as `0x${string}`);
         }
         if (storedFactory && storedFactory.startsWith("0x")) {
             setFactoryAddress(storedFactory as `0x${string}`);
@@ -27,7 +27,7 @@ export function useContractAddresses() {
     const updateUsdtAddress = (addr: string) => {
         if (!addr.startsWith("0x")) return;
         setUsdtAddress(addr as `0x${string}`);
-        localStorage.setItem(STORAGE_KEY_USDT, addr);
+        localStorage.setItem(STORAGE_KEY_USDC, addr);
         window.location.reload(); // Simple way to propagate changes to all components nicely
     };
 
@@ -39,9 +39,9 @@ export function useContractAddresses() {
     };
 
     const resetDefaults = () => {
-        setUsdtAddress(CONTRACTS.coston2.USDTToken);
-        setFactoryAddress(CONTRACTS.coston2.VaultFactory);
-        localStorage.removeItem(STORAGE_KEY_USDT);
+        setUsdtAddress(CONTRACTS.arbitrumSepolia.USDCToken);
+        setFactoryAddress(CONTRACTS.arbitrumSepolia.VaultFactory);
+        localStorage.removeItem(STORAGE_KEY_USDC);
         localStorage.removeItem(STORAGE_KEY_FACTORY);
         window.location.reload();
     };

@@ -54,7 +54,7 @@ export default function Dashboard() {
     const [inputAddress, setInputAddress] = useState("");
     const [totalLocked, setTotalLocked] = useState("0.00");
 
-    // USDT Balance
+    // USDC Balance
     const { data: balance, isLoading, isError, error } = useReadContract({
         address: usdtAddress,
         abi: ERC20_ABI,
@@ -73,7 +73,7 @@ export default function Dashboard() {
     });
 
     if (isError) {
-        console.error("USDT Balance Error:", error);
+        console.error("USDC Balance Error:", error);
     }
 
     // Get user's vaults
@@ -88,7 +88,7 @@ export default function Dashboard() {
             if (address && publicClient && factoryAddress) {
                 try {
                     // 1. Get DB Vaults
-                    const dbVaults = await getUserVaultsFromDb(address);
+                    const dbVaults = await getUserVaultsFromDb(address, factoryAddress);
 
                     // 2. Get Chain Vaults
                     let chainVaults: string[] = [];
@@ -225,8 +225,8 @@ export default function Dashboard() {
 
     const stats = [
         {
-            label: "USDT0 Balance",
-            value: isLoading ? "Loading..." : isError ? "Error" : `${formattedBalance} USDT0`,
+            label: "USDC Balance",
+            value: isLoading ? "Loading..." : isError ? "Error" : `${formattedBalance} USDC`,
             icon: Wallet,
             color: "text-green-400",
             isPrivacy: true

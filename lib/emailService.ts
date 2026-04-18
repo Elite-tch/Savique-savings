@@ -49,7 +49,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
     const brandColor = '#E62058';
     const darkBg = '#18181B';
     const logoUrl = 'https://res.cloudinary.com/dibwnfwk9/image/upload/v1770464073/ChatGPT_Image_Feb_6__2026__07_08_19_AM-removebg-preview_tvlkzh.png'; // Your Savique logo
-    const explorerUrl = data.txHash ? `https://coston2-explorer.flare.network/tx/${data.txHash}` : '';
+    const explorerUrl = data.txHash ? `https://sepolia.arbiscan.io/tx/${data.txHash}` : '';
 
     switch (type) {
         case 'DEPOSIT_CONFIRMED':
@@ -90,7 +90,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #71717A; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount</td>
-                                                                <td align="right" style="color: #18181B; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #18181B; font-size: 20px; font-weight: 700;">${data.amount} USDC</td>
                                                             </tr>
                                                             ${data.unlockDate ? `
                                                             <tr>
@@ -111,7 +111,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             
                                             
                                             <p style="color: #A1A1AA; font-size: 12px; margin: 24px 0 0 0; line-height: 1.5;">
-                                                This is a verifiable digital receipt. Keep it for your records. Your commitment is secured on the Flare Coston2 Network.
+                                                This is a verifiable digital receipt. Keep it for your records. Your commitment is secured on the Arbitrum Sepolia Network.
                                             </p>
                                         </td>
                                     </tr>
@@ -120,7 +120,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                         </td>
                                     </tr>
@@ -170,12 +170,12 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #6D28D9; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Added</td>
-                                                                <td align="right" style="color: #5B21B6; font-size: 20px; font-weight: 700;">+${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #5B21B6; font-size: 20px; font-weight: 700;">+${data.amount} USDC</td>
                                                             </tr>
                                                             ${data.currentBalance ? `
                                                             <tr>
                                                                 <td style="color: #6D28D9; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">New Balance</td>
-                                                                <td align="right" style="color: #5B21B6; font-size: 14px; font-weight: 600;">${data.currentBalance} USDT0</td>
+                                                                <td align="right" style="color: #5B21B6; font-size: 14px; font-weight: 600;">${data.currentBalance} USDC</td>
                                                             </tr>
                                                             ` : ''}
                                                             ${data.unlockDate ? `
@@ -208,7 +208,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                         </td>
                                     </tr>
@@ -258,7 +258,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Current Balance</td>
-                                                                <td align="right" style="color: #78350F; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #78350F; font-size: 20px; font-weight: 700;">${data.amount} USDC</td>
                                                             </tr>
                                                             <tr>
                                                                 <td style="color: #92400E; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Unlock Date</td>
@@ -279,7 +279,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                       </td>
                                     </tr>
@@ -330,7 +330,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                     <td style="padding: 24px; text-align: center;">
                                                         <p style="color: ${urgencyColor}; font-size: 14px; font-weight: 600; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px;">Unlocks On</p>
                                                         <p style="color: #18181B; font-size: 24px; font-weight: 700; margin: 0;">${data.unlockDate}</p>
-                                                        ${data.amount ? `<p style="color: #71717A; font-size: 14px; margin: 12px 0 0 0;">Current Balance: <strong>${data.amount} USDT0</strong></p>` : ''}
+                                                        ${data.amount ? `<p style="color: #71717A; font-size: 14px; margin: 12px 0 0 0;">Current Balance: <strong>${data.amount} USDC</strong></p>` : ''}
                                                     </td>
                                                 </tr>
                                             </table>
@@ -351,7 +351,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                         </td>
                                     </tr>
@@ -402,13 +402,13 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                             ${data.currentBalance ? `
                                                             <tr>
                                                                 <td style="color: #1E40AF; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Current Balance</td>
-                                                                <td align="right" style="color: #1E3A8A; font-size: 20px; font-weight: 700;">${data.currentBalance} USDT0</td>
+                                                                <td align="right" style="color: #1E3A8A; font-size: 20px; font-weight: 700;">${data.currentBalance} USDC</td>
                                                             </tr>
                                                             ` : ''}
                                                             ${data.targetAmount ? `
                                                             <tr>
                                                                 <td style="color: #1E40AF; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Target Amount</td>
-                                                                <td align="right" style="color: #1E3A8A; font-size: 14px; font-weight: 600;">${data.targetAmount} USDT0</td>
+                                                                <td align="right" style="color: #1E3A8A; font-size: 14px; font-weight: 600;">${data.targetAmount} USDC</td>
                                                             </tr>
                                                             ` : ''}
                                                             ${data.daysRemaining ? `
@@ -442,7 +442,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                         </td>
                                     </tr>
@@ -492,7 +492,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #047857; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Withdrawn</td>
-                                                                <td align="right" style="color: #065F46; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #065F46; font-size: 20px; font-weight: 700;">${data.amount} USDC</td>
                                                             </tr>
                                                             <tr>
                                                                 <td style="color: #047857; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Status</td>
@@ -519,7 +519,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     </tr>
                                     
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                 </table>
                             </td>
@@ -567,7 +567,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Recovered</td>
-                                                                <td align="right" style="color: #7F1D1D; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #7F1D1D; font-size: 20px; font-weight: 700;">${data.amount} USDC</td>
                                                             </tr>
                                                             <tr>
                                                                 <td style="color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Penalty Applied</td>
@@ -599,7 +599,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                         </td>
                                     </tr>
@@ -649,7 +649,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                                         <table width="100%" cellpadding="8" cellspacing="0">
                                                             <tr>
                                                                 <td style="color: #991B1B; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Amount Attempted</td>
-                                                                <td align="right" style="color: #991B1B; font-size: 20px; font-weight: 700;">${data.amount} USDT0</td>
+                                                                <td align="right" style="color: #991B1B; font-size: 20px; font-weight: 700;">${data.amount} USDC</td>
                                                             </tr>
                                                             ${data.txHash ? `
                                                             <tr>
@@ -667,8 +667,8 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                             <div style="background-color: #F8FAFC; border-radius: 8px; padding: 16px; border: 1px solid #E2E8F0; margin-bottom: 24px;">
                                                 <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.5;">
                                                     <strong>Possible Reasons:</strong><br>
-                                                    • Insufficient USDT0 balance for the transaction.<br>
-                                                    • Network congestion on Flare Coston2.<br>
+                                                    • Insufficient USDC balance for the transaction.<br>
+                                                    • Network congestion on Arbitrum Sepolia.<br>
                                                     • Transaction timed out or was manually rejected in wallet.
                                                 </p>
                                             </div>
@@ -685,7 +685,7 @@ export async function sendNotificationEmail(type: EmailType, data: EmailData) {
                                     <tr>
                                         <td style="background-color: #FAFAFA; padding: 24px; text-align: center; border-top: 1px solid #E4E4E7;">
                                             <p style="margin: 0; color: #A1A1AA; font-size: 12px;">
-                                                Savique Protocol • Decentralized Savings on Flare Network
+                                                Savique Protocol • Decentralized Savings on Arbitrum Network
                                             </p>
                                         </td>
                                     </tr>

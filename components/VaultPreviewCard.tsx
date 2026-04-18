@@ -30,7 +30,7 @@ export function VaultPreviewCard({ address, index }: { address: `0x${string}`; i
     });
 
     const { data: decimals } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'decimals',
     });

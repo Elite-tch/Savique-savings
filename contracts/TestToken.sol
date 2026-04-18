@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract TestToken is ERC20 {
-    constructor() ERC20("Coston2 Test Token", "TEST") {
+    constructor() ERC20("Arbitrum Test Token", "USDT0") {
         _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 

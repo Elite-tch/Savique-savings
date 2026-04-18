@@ -152,7 +152,7 @@ export default function ActiveSavingsPage() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="h-8 w-8 p-0"
-                                                onClick={() => window.open(`https://coston2-explorer.flare.network/address/${vault.vaultAddress}`, '_blank')}
+                                                onClick={() => window.open(`https://sepolia.arbiscan.io/address/${vault.vaultAddress}`, '_blank')}
                                             >
                                                 <ExternalLink size={14} />
                                             </Button>

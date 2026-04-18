@@ -3,19 +3,20 @@ import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
 import * as dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ path: ".env.local" });
+dotenv.config(); // Fallback to .env if both exist
 
 const config: HardhatUserConfig = {
     solidity: "0.8.20",
     networks: {
-        coston2: {
-            url: "https://coston2-api.flare.network/ext/C/rpc",
-            chainId: 114,
+        arbitrumSepolia: {
+            url: "https://sepolia-rollup.arbitrum.io/rpc",
+            chainId: 421614,
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         },
-        flare: {
-            url: "https://flare-api.flare.network/ext/C/rpc",
-            chainId: 14,
+        arbitrumOne: {
+            url: "https://arb1.arbitrum.io/rpc",
+            chainId: 42161,
             accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         }
     },

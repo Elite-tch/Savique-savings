@@ -158,7 +158,7 @@ export default function AnalysisPage() {
     // Mocked Projection Data
     const projectionData = useMemo(() => {
         const base = stats.activeBalance || 1000;
-        // Visualizing a 1% cumulative bonus (representing 10% share of a ~10% yield)
+        // Visualizing a 1% cumulative bonus (representing 10% share of a ~10% interest)
         return [
             { name: 'Start', principal: base, total: base },
             { name: '3 Months', principal: base, total: base * 1.0025 },

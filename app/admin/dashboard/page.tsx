@@ -221,7 +221,7 @@ export default function AdminDashboard() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="h-7 w-7 p-0 hover:bg-white/10"
-                                                onClick={() => window.open(`https://coston2-explorer.flare.network/tx/${r.txHash}`, '_blank')}
+                                                onClick={() => window.open(`https://sepolia.arbiscan.io/tx/${r.txHash}`, '_blank')}
                                                 title="View Transaction"
                                             >
                                                 <ExternalLink size={12} className="text-blue-400" />

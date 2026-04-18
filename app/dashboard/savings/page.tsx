@@ -91,7 +91,7 @@ function CompletedVaultCard({
                             <p className="text-[10px] text-zinc-500 uppercase font-bold mb-0.5">Withdrawn</p>
                             <div className="flex items-baseline gap-1">
                                 <span className="text-xl font-bold text-white">{receipt?.amount || "0.00"}</span>
-                                <span className="text-[10px] text-zinc-500">USDT0</span>
+                                <span className="text-[10px] text-zinc-500">USDC</span>
                             </div>
                         </div>
                         <div className="text-right">
@@ -123,7 +123,7 @@ function CompletedVaultCard({
 // Keep the original VaultCard but update it for integration
 function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: string }) {
     const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
-    const { data: decimals } = useReadContract({ address: CONTRACTS.coston2.USDTToken, abi: ERC20_ABI, functionName: 'decimals' });
+    const { data: decimals } = useReadContract({ address: CONTRACTS.arbitrumSepolia.USDCToken, abi: ERC20_ABI, functionName: 'decimals' });
     const { data: balanceResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
     const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
 
@@ -172,7 +172,12 @@ function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: 
                 <Card className="bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer group h-full">
                     <div className="p-4 space-y-4">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-white truncate max-w-[200px]">{purpose || "Loading..."}</h3>
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-bold text-white truncate max-w-[200px]">{purpose || "Loading..."}</h3>
+                                {vaultData?.vaultId && (
+                                    <div className="text-[10px] font-mono text-primary/60">NFT: VAULT #{vaultData.vaultId}</div>
+                                )}
+                            </div>
                             <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${isLocked 
                                 ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' 
                                 : progressValue >= 100 
@@ -223,7 +228,7 @@ function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: 
                         <div className="pt-3 border-t border-white/5">
                             <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Total Savings</p>
                             <div className="text-2xl font-bold text-white flex items-baseline gap-1">
-                                {parseFloat(balance).toLocaleString()} <span className="text-[10px] font-normal text-zinc-500">USDT0</span>
+                                {parseFloat(balance).toLocaleString()} <span className="text-[10px] font-normal text-zinc-500">USDC</span>
                             </div>
                         </div>
                     </div>
@@ -275,9 +280,9 @@ function SavingsDashboard() {
             try {
                 // 1. Get unique vault addresses from DB and Chain in parallel
                 const [dbVaults, rawChainVaults] = await Promise.all([
-                    getUserVaultsFromDb(address),
+                    getUserVaultsFromDb(address, CONTRACTS.arbitrumSepolia.VaultFactory),
                     publicClient.readContract({
-                        address: CONTRACTS.coston2.VaultFactory,
+                        address: CONTRACTS.arbitrumSepolia.VaultFactory,
                         abi: VAULT_FACTORY_ABI,
                         functionName: "getUserVaults",
                         args: [address]
@@ -302,6 +307,13 @@ function SavingsDashboard() {
                 // but wagmiConfig transport handles batching naturally.
                 const results = await Promise.all(uniqueAddresses.map(async (vaddr) => {
                     try {
+                        // Check if the code exists at this address
+                        const code = await publicClient.getBytecode({ address: vaddr });
+                        if (!code || code === '0x') {
+                            console.warn(`[Vault] No contract found at address ${vaddr} on this network. Skipping...`);
+                            return null;
+                        }
+
                         const [balanceResult, unlockResult] = await Promise.all([
                             publicClient.readContract({
                                 address: vaddr,
@@ -326,12 +338,12 @@ function SavingsDashboard() {
 
                 // 3. Identification of completed (zero balance) vaults for Withdrawal tab
                 const completedAddresses = validResults
-                    .filter(res => parseFloat(formatUnits(res.balanceResult, 18)) === 0)
+                    .filter(res => parseFloat(formatUnits(res.balanceResult, 6)) === 0)
                     .map(res => res.vaddr);
 
                 // Parallel fetch metadata and receipts for completed vaults
                 const [allReceipts, ...allMetadataResults] = await Promise.all([
-                    getReceiptsByWallet(address),
+                    getReceiptsByWallet(address, CONTRACTS.arbitrumSepolia.VaultFactory),
                     ...completedAddresses.map(vaddr => getVaultByAddress(vaddr))
                 ]);
 

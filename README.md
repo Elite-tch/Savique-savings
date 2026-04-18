@@ -48,7 +48,7 @@ A visual command center for tracking Total Value Locked (TVL) and wealth traject
 
 ## 🏗️ Technical Stack
 
-*   **Network**: Flare Coston2 (Low-latency, high-security L1).
+*   **Network**: Arbitrum Sepolia (Ultra-low latency, Ethereum security L2).
 *   **Verification**: ProofRails SDK for cryptographically signed financial statements.
 *   **Persistence**: Firebase for user profiles and professional notification routing.
 *   **Standard**: OpenZeppelin-standard smart contracts for non-custodial security.
@@ -66,6 +66,5 @@ A visual command center for tracking Total Value Locked (TVL) and wealth traject
 
 ---
 
-## 🌐 On-Chain Verification
-The `VaultFactory` is currently deployed and verified on **Flare Coston2**:
-`0x4E70a85B1553ef34128C13C52B81A5862e4A11Dc`
+The `VaultFactory` is currently deployed and verified on **Arbitrum Sepolia**:
+`0x25333E809be8E9101491518abd52Ac1133137c30`

@@ -68,12 +68,12 @@ export default function BeneficiaryReleasesPage() {
             // Get decimals and all vaults
             const [tokenDecimals, allVaults] = await Promise.all([
                 publicClient.readContract({
-                    address: CONTRACTS.coston2.USDTToken,
+                    address: CONTRACTS.arbitrumSepolia.USDCToken,
                     abi: ERC20_ABI,
                     functionName: 'decimals',
                 }),
                 publicClient.readContract({
-                    address: CONTRACTS.coston2.VaultFactory,
+                    address: CONTRACTS.arbitrumSepolia.VaultFactory,
                     abi: VAULT_FACTORY_ABI,
                     functionName: 'getAllVaults',
                 })
@@ -155,7 +155,7 @@ export default function BeneficiaryReleasesPage() {
         toastId.current = toast.loading("Authorizing Release...", toastStyle);
 
         writeContract({
-            address: CONTRACTS.coston2.VaultFactory,
+            address: CONTRACTS.arbitrumSepolia.VaultFactory,
             abi: VAULT_FACTORY_ABI,
             functionName: "triggerBeneficiaryClaim",
             args: [vaultAddress as `0x${string}`]
@@ -219,7 +219,7 @@ export default function BeneficiaryReleasesPage() {
                                         <div className="flex items-center gap-2 text-sm">
                                             <Wallet className="w-4 h-4 text-gray-500" />
                                             <span className="text-gray-400">Balance:</span>
-                                            <span className="text-white font-bold">{parseFloat(vault.balance).toFixed(2)} USDT0</span>
+                                            <span className="text-white font-bold">{parseFloat(vault.balance).toFixed(2)} USDC</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-sm">
                                             <ShieldCheck className="w-4 h-4 text-gray-500" />

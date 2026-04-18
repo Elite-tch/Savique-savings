@@ -12,7 +12,8 @@ import {
 export interface Receipt {
     id?: string;
     walletAddress: string;
-    vaultAddress?: string; // Optinal for backward compatibility
+    vaultAddress?: string; // Optional for backward compatibility
+    factoryAddress?: string; // For network filtering
     txHash: string;
     timestamp: number;
     purpose: string;
@@ -20,9 +21,32 @@ export interface Receipt {
     verified: boolean;
     type: 'created' | 'breaked' | 'completed';
     penalty?: string;
+    vaultId?: number;
 }
 
 const RECEIPTS_COLLECTION = 'receipts';
+
+// List of all factory versions used on Arbitrum Sepolia to prevent "disappearing" savings
+const KNOWN_FACTORIES = [
+    "0x25333E809be8E9101491518abd52Ac1133137c30", // Original
+    "0x9818512cce53c0b6E5838b32385887E81B5e7faE7", // V2
+    "0xf8225e6bE64CDf091B92d3C250F4FbfbC92a308d", // V2.1 Broken
+    "0xB11E956f8388261d08B4202411965D187B2A3Fa2", // V2.1 Final
+    "0x2895B27A2Df83A471519bB6690528049421F7C04", // V2.2 Corrected Treasury
+    "0x3AE07d625Eab21b1383686d410EC2AF818B0E744", // V2.3 Final Treasury
+    "0x985289945199859f519962a4d3A849c95B4468f9", // V2
+    "0x71941de02D2566e900B1EE5bAd6AF1bEE1f110d9", // V3 (NFT)
+    "0xD799d10fAECfa3D9FdBe5b7c940bb176d931A5f0", // V4 (On-Chain NFT)
+    "0xC78178AbdFC385E6dD1E4e8304545741e44B92d3", // V5 (Fixed JSON)
+    "0x0484780F5aA1EbD7bD7e6C4c72ADFDA2c0c9D57A", // V6 (OpenZeppelin Standard)
+    "0x85856bFecBe6d46863e2B11A22c1aD58B74A2Ab1"  // V7 (Tiered Rewards)
+].map(a => a.toLowerCase());
+
+function isSameNetwork(fact1: string, fact2: string) {
+    if (fact1.toLowerCase() === fact2.toLowerCase()) return true;
+    if (KNOWN_FACTORIES.includes(fact1.toLowerCase()) && KNOWN_FACTORIES.includes(fact2.toLowerCase())) return true;
+    return false;
+}
 
 /**
  * Save a receipt to Firestore
@@ -59,27 +83,38 @@ export async function updateReceipt(id: string, updates: Partial<Receipt>): Prom
 /**
  * Get all receipts for a specific wallet address
  */
-export async function getReceiptsByWallet(walletAddress: string): Promise<Receipt[]> {
+export async function getReceiptsByWallet(walletAddress: string, factoryAddress?: string): Promise<Receipt[]> {
     try {
         const receiptsRef = collection(db, RECEIPTS_COLLECTION);
         const q = query(
             receiptsRef,
-            where('walletAddress', '==', walletAddress.toLowerCase()),
-            orderBy('timestamp', 'desc')
+            where('walletAddress', '==', walletAddress.toLowerCase())
         );
 
         const querySnapshot = await getDocs(q);
         const receipts: Receipt[] = [];
 
         querySnapshot.forEach((doc) => {
-            receipts.push({
-                id: doc.id,
-                ...doc.data()
-            } as Receipt);
+            const data = doc.data() as Receipt & { factoryAddress?: string };
+            
+            if (factoryAddress) {
+                // Strict check: If a factory filter is active:
+                // 1. If it has a factoryAddress, it MUST match.
+                // 2. If it has NO factoryAddress (Legacy Network), skip it.
+                // Check if it belongs to any of our known factories for this network
+                if (data.factoryAddress) {
+                    if (isSameNetwork(data.factoryAddress, factoryAddress)) {
+                        receipts.push({ id: doc.id, ...data });
+                    }
+                }
+                // (Legacy records without factoryAddress are ignored)
+            } else {
+                receipts.push({ id: doc.id, ...data });
+            }
         });
 
-        console.log(`[Firebase] Loaded ${receipts.length} receipts for wallet:`, walletAddress);
-        return receipts;
+        // Client-side sort by timestamp desc
+        return receipts.sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
         console.error('[Firebase] Error loading receipts:', error);
         throw error;
@@ -216,26 +251,55 @@ export async function saveVault(data: SavedVault): Promise<string> {
     }
 }
 
-export async function getUserVaultsFromDb(ownerAddress: string): Promise<string[]> {
+export async function getUserVaultsFromDb(ownerAddress: string, factoryAddress?: string): Promise<string[]> {
     try {
         const vaultsRef = collection(db, VAULTS_COLLECTION);
+        // Simple query without multiple wheres to avoid index error
         const q = query(
             vaultsRef,
-            where('owner', '==', ownerAddress.toLowerCase()),
-            orderBy('createdAt', 'desc')
+            where('owner', '==', ownerAddress.toLowerCase())
         );
 
         const querySnapshot = await getDocs(q);
-        const addresses: string[] = [];
+        const vaults: any[] = [];
         querySnapshot.forEach((doc) => {
             const data = doc.data();
+            // Strict check: Only show vaults for the active network
+            // Performance optimization: Allow all known factories for the current network
+            if (factoryAddress) {
+                const vaultFactory = data.factoryAddress?.toLowerCase() || '';
+                if (!isSameNetwork(vaultFactory, factoryAddress)) {
+                    return;
+                }
+            }
             if (data.vaultAddress) {
-                addresses.push(data.vaultAddress);
+                let created = data.createdAt;
+                if (created && typeof created.toMillis === 'function') {
+                    created = created.toMillis();
+                }
+                vaults.push({
+                    address: data.vaultAddress,
+                    createdAt: created || 0
+                });
             }
         });
-        return addresses;
+
+        // Client-side sort by createdAt desc
+        return vaults
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .map(v => v.address);
     } catch (error) {
         console.error('Error fetching vaults from DB:', error);
+        const vaultsRef = collection(db, VAULTS_COLLECTION);
+        // If index is missing, fallback to owner only and filter manually
+        if (error instanceof Error && error.message.includes('index')) {
+            const fallbackQ = query(vaultsRef, where('owner', '==', ownerAddress.toLowerCase()));
+            const snapshot = await getDocs(fallbackQ);
+            return snapshot.docs
+                .map(doc => doc.data() as SavedVault)
+                .filter(data => !factoryAddress || data.factoryAddress?.toLowerCase() === factoryAddress.toLowerCase())
+                .map(data => data.vaultAddress);
+        }
         return [];
     }
 }
@@ -271,20 +335,25 @@ export async function getVaultByAddress(vaultAddress: string): Promise<SavedVaul
 /**
  * Get ALL vaults for Admin Dashboard
  */
-export async function getAllVaults(): Promise<SavedVault[]> {
+export async function getAllVaults(factoryAddress?: string): Promise<SavedVault[]> {
     try {
         const vaultsRef = collection(db, VAULTS_COLLECTION);
-        const q = query(vaultsRef, orderBy('createdAt', 'desc'));
-
-        const querySnapshot = await getDocs(q);
+        
+        // Simple query without multiple wheres to avoid index error
+        const querySnapshot = await getDocs(vaultsRef);
         const vaults: SavedVault[] = [];
 
         querySnapshot.forEach((doc) => {
             const data = doc.data();
-            // Map Firestore Timestamp to number if needed, or keep as is.
-            // SavedVault interface says createdAt is number.
-            // But we saved it as Timestamp.now() in saveVault.
-            // Let's handle both.
+            
+            // Strict check: Only show vaults for the active network
+            if (factoryAddress) {
+                const vaultFactory = data.factoryAddress?.toLowerCase() || '';
+                if (!isSameNetwork(vaultFactory, factoryAddress)) {
+                    return;
+                }
+            }
+
             let created = data.createdAt;
             if (created && typeof created.toMillis === 'function') {
                 created = created.toMillis();
@@ -299,8 +368,8 @@ export async function getAllVaults(): Promise<SavedVault[]> {
             });
         });
 
-        console.log(`[Admin] Loaded ${vaults.length} total vaults`);
-        return vaults;
+        // Client-side sort
+        return vaults.sort((a, b) => b.createdAt - a.createdAt);
     } catch (error) {
         console.error('[Admin] Error fetching all vaults:', error);
         return [];
@@ -310,20 +379,25 @@ export async function getAllVaults(): Promise<SavedVault[]> {
 /**
  * Get ALL receipts for Admin Metrics
  */
-export async function getAllReceipts(): Promise<Receipt[]> {
+export async function getAllReceipts(factoryAddress?: string): Promise<Receipt[]> {
     try {
         const receiptsRef = collection(db, RECEIPTS_COLLECTION);
-        const q = query(receiptsRef, orderBy('timestamp', 'desc'));
+        let q = query(receiptsRef, orderBy('timestamp', 'desc'));
 
         const querySnapshot = await getDocs(q);
         const receipts: Receipt[] = [];
 
         querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            receipts.push({
-                id: doc.id,
-                ...data
-            } as Receipt);
+            const data = doc.data() as Receipt & { factoryAddress?: string };
+            
+            if (factoryAddress) {
+                // Strict check: Skip anything that doesn't match the active factory network
+                if (data.factoryAddress && isSameNetwork(data.factoryAddress, factoryAddress)) {
+                    receipts.push({ id: doc.id, ...data });
+                }
+            } else {
+                receipts.push({ id: doc.id, ...data });
+            }
         });
 
         return receipts;

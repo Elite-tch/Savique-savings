@@ -20,6 +20,8 @@ interface VaultBreakModalProps {
     penaltyBps?: number; // Basis points, e.g., 1000 for 10%
 }
 
+import { CONTRACTS } from "@/lib/contracts";
+
 export function VaultBreakModal({
     isOpen,
     onClose,
@@ -54,6 +56,7 @@ export function VaultBreakModal({
                 address,
                 abi: VAULT_ABI,
                 functionName: "withdraw",
+                gasPrice: BigInt(100000000)
             });
         } catch (error) {
             console.error(error);
@@ -86,6 +89,7 @@ export function VaultBreakModal({
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
                         vaultAddress: address,
+                        factoryAddress: CONTRACTS.arbitrumSepolia.VaultFactory,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
                         purpose: purpose || "Savings Broken",
@@ -100,7 +104,8 @@ export function VaultBreakModal({
                         "Savings Broken",
                         `You broke "${purpose}" early. Funds recovered with penalty applied.`,
                         'warning',
-                        '/dashboard/history'
+                        '/dashboard/history',
+                        CONTRACTS.arbitrumSepolia.VaultFactory
                     );
 
                     // Send Professional Email Notification
@@ -166,16 +171,16 @@ export function VaultBreakModal({
                     <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-5 space-y-4">
                         <div className="flex justify-between items-center text-sm">
                             <span className="text-zinc-400">Locked Balance</span>
-                            <span className="font-mono text-white">{parseFloat(balance).toFixed(2)} USDT0</span>
+                            <span className="font-mono text-white">{parseFloat(balance).toFixed(2)} USDC</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-red-400">
                             <span className="flex items-center gap-1"><TrendingDown className="w-4 h-4" /> Commitment Fee ({penaltyPercent}%)</span>
-                            <span className="font-mono font-bold">-{penaltyAmount.toFixed(2)} USDT0</span>
+                            <span className="font-mono font-bold">-{penaltyAmount.toFixed(2)} USDC</span>
                         </div>
                         <div className="h-px bg-red-500/20 w-full" />
                         <div className="flex justify-between items-center">
                             <span className="text-white font-medium">You Recover</span>
-                            <span className="font-mono font-bold text-xl text-white">{amountToReceive.toFixed(2)} USDT0</span>
+                            <span className="font-mono font-bold text-xl text-white">{amountToReceive.toFixed(2)} USDC</span>
                         </div>
                     </div>
                     <p className="text-xs text-center text-zinc-500 px-4">

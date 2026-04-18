@@ -4,7 +4,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { sendNotificationEmail, EmailType } from '@/lib/emailService';
 import { getUserProfile } from '@/lib/userService';
 import { createPublicClient, http } from 'viem';
-import { flareTestnet } from 'viem/chains';
+import { arbitrumSepolia } from 'viem/chains';
 import { VAULT_ABI, VAULT_FACTORY_ABI, CONTRACTS } from '@/lib/contracts';
 import { getUserVaultsFromDb } from '@/lib/receiptService';
 
@@ -13,7 +13,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 // Create public client for reading blockchain data
 const publicClient = createPublicClient({
-    chain: flareTestnet,
+    chain: arbitrumSepolia,
     transport: http()
 });
 
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
                     // Fallback to contract if DB is empty (rare but possible)
                     if (!vaults || vaults.length === 0) {
                         vaults = await publicClient.readContract({
-                            address: CONTRACTS.coston2.VaultFactory,
+                            address: CONTRACTS.arbitrumSepolia.VaultFactory,
                             abi: VAULT_FACTORY_ABI,
                             functionName: 'getUserVaults',
                             args: [walletAddress as `0x${string}`]
@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
                         ]);
 
                         const unlockTimestamp = Number(unlockTime) * 1000;
-                        const balanceNum = Number(balance) / 1e6; // USDT has 6 decimals
+                        const balanceNum = Number(balance) / 1e6; // USDC has 6 decimals
 
                         // Skip if already unlocked or empty
                         if (unlockTimestamp <= now || balanceNum <= 0) {

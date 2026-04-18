@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAccount } from "wagmi";
-import { Mail, Shield, Bell, CheckCircle2, Loader2, Wallet } from "lucide-react";
+import { Mail, Shield, Bell, CheckCircle2, Loader2, Wallet, Send } from "lucide-react";
 import { getUserProfile, updateUserProfile, UserProfile } from "@/lib/userService";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -14,6 +14,7 @@ export default function SettingsPage() {
     const { address, isConnected } = useAccount();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [testingEmail, setTestingEmail] = useState(false);
     const [email, setEmail] = useState("");
     const [preferences, setPreferences] = useState({
         deposits: true,
@@ -66,6 +67,37 @@ export default function SettingsPage() {
             toast.error("Failed to update profile", toastStyle);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleTestEmail = async () => {
+        if (!email) {
+            toast.error("Enter an email address first.", toastStyle);
+            return;
+        }
+        setTestingEmail(true);
+        try {
+            const res = await fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'DEPOSIT_CONFIRMED',
+                    userEmail: email,
+                    purpose: 'Test Savings Goal',
+                    amount: '10',
+                    txHash: '0xTEST_HASH_1234567890',
+                    unlockDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+                })
+            });
+            if (res.ok) {
+                toast.success("Test email sent! Check your inbox.", toastStyle);
+            } else {
+                toast.error("Failed to send test email. Check your SMTP settings.", toastStyle);
+            }
+        } catch (err) {
+            toast.error("Network error sending test email.", toastStyle);
+        } finally {
+            setTestingEmail(false);
         }
     };
 
@@ -165,6 +197,30 @@ export default function SettingsPage() {
                                 )}
                             </Button>
                         </form>
+
+                        {/* Test Email Button */}
+                        <div className="mt-4 pt-4 border-t border-white/5">
+                            <p className="text-xs text-zinc-500 mb-3">Once you've saved your email, click below to verify it's working:</p>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={testingEmail || !email}
+                                onClick={handleTestEmail}
+                                className="w-full h-11 border-zinc-700 hover:bg-white/5 text-zinc-300 font-semibold rounded-xl flex items-center justify-center gap-2"
+                            >
+                                {testingEmail ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Sending Test...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send className="w-4 h-4" />
+                                        Send Test Email
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </Card>
                 </div>
 

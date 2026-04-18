@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Rocket, AlertTriangle, ShieldCheck, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, Rocket, AlertTriangle, ShieldCheck, Coins, Lock, Calendar, TrendingUp, Info, Plus, Wallet, Receipt, Loader2, Check, ChevronDown, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -76,9 +76,9 @@ export default function CreatePersonalVault() {
     const { address, isConnected, isConnecting, isReconnecting } = useAccount();
     const publicClient = usePublicClient();
 
-    // USDT Balance
+    // USDC Balance
     const { data: balance } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [address as `0x${string}`],
@@ -86,19 +86,33 @@ export default function CreatePersonalVault() {
     });
 
     const { data: decimals } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'decimals',
     });
 
     // Check Allowance
     const { data: allowance, refetch: refetchAllowance } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: [address as `0x${string}`, CONTRACTS.coston2.VaultFactory],
+        args: [address as `0x${string}`, CONTRACTS.arbitrumSepolia.VaultFactory],
         query: { enabled: !!address },
     });
+
+    // Check if user has an email configured
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [emailChecked, setEmailChecked] = useState(false);
+
+    useEffect(() => {
+        const checkEmail = async () => {
+            if (!address) return;
+            const profile = await getUserProfile(address);
+            setUserEmail(profile?.email || null);
+            setEmailChecked(true);
+        };
+        checkEmail();
+    }, [address]);
 
     const [formData, setFormData] = useState({
         purpose: "",
@@ -114,7 +128,7 @@ export default function CreatePersonalVault() {
     const toastId = useRef<string | number | null>(null);
 
     // Multi-step state
-    type Step = 'idle' | 'approving' | 'creating' | 'generating_proof' | 'done';
+    type Step = 'idle' | 'approving' | 'creating' | 'finalizing' | 'done';
     const [currentStep, setCurrentStep] = useState<Step>('idle');
     const [createdVaultAddress, setCreatedVaultAddress] = useState<`0x${string}` | null>(null);
     const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
@@ -145,7 +159,7 @@ export default function CreatePersonalVault() {
             if (isSuccess && receipt) {
                 if (currentStep === 'approving') {
                     toast.dismiss(toastId.current as string);
-                    toast.success("USDT Approved!", toastStyle);
+                    toast.success("USDC Approved!", toastStyle);
 
                     toastId.current = toast.loading("Creating & Funding Savings...", toastStyle);
                     setTxHash(undefined);
@@ -163,8 +177,10 @@ export default function CreatePersonalVault() {
                                     data: log.data,
                                     topics: log.topics
                                 });
-                                if (decoded.eventName === 'PersonalVaultCreated') {
-                                    newVault = (decoded.args as any).vaultAddress;
+                                if (decoded.eventName === 'VaultCreated') {
+                                    newVault = (decoded.args as any).vault;
+                                    const vaultId = Number((decoded.args as any).vaultId);
+                                    (receipt as any).vaultId = vaultId;
                                     break;
                                 }
                             } catch (e) { }
@@ -172,7 +188,7 @@ export default function CreatePersonalVault() {
 
                         if (!newVault) {
                             const userVaults = await publicClient!.readContract({
-                                address: CONTRACTS.coston2.VaultFactory,
+                                address: CONTRACTS.arbitrumSepolia.VaultFactory,
                                 abi: VAULT_FACTORY_ABI,
                                 functionName: 'getUserVaults',
                                 args: [address!]
@@ -184,8 +200,8 @@ export default function CreatePersonalVault() {
                             setCreatedVaultAddress(newVault as `0x${string}`);
                             toast.success("Savings Created!", toastStyle);
                             setTxHash(undefined);
-                            setCurrentStep('generating_proof');
-                            handleFinalize(receipt.transactionHash, newVault);
+                            setCurrentStep('finalizing');
+                            handleFinalize(receipt.transactionHash, newVault, (receipt as any).vaultId);
                         } else {
                             throw new Error("Could not find new savings address");
                         }
@@ -286,7 +302,7 @@ export default function CreatePersonalVault() {
         const amountUnits = parseUnits(formData.amount, decimals || 18);
 
         writeContract({
-            address: CONTRACTS.coston2.VaultFactory,
+            address: CONTRACTS.arbitrumSepolia.VaultFactory,
             abi: VAULT_FACTORY_ABI,
             functionName: "createPersonalVault",
             args: [
@@ -295,7 +311,9 @@ export default function CreatePersonalVault() {
                 BigInt(penaltyBps),
                 amountUnits,
                 (formData.beneficiary || "0x0000000000000000000000000000000000000000") as `0x${string}`
-            ]
+            ],
+            // Add gas buffer for Arbitrum Sepolia
+            gasPrice: BigInt(100000000) // 0.1 Gwei - very safe for testnet
         }, {
             onSuccess: (hash) => setTxHash(hash)
         });
@@ -307,12 +325,14 @@ export default function CreatePersonalVault() {
             const amountUnits = parseUnits(formData.amount, decimals || 18);
             if (!allowance || allowance < amountUnits) {
                 setCurrentStep('approving');
-                toastId.current = toast.loading("Approving USDT...", toastStyle);
+                toastId.current = toast.loading("Approving USDC...", toastStyle);
                 writeContract({
-                    address: CONTRACTS.coston2.USDTToken,
+                    address: CONTRACTS.arbitrumSepolia.USDCToken,
                     abi: ERC20_ABI,
                     functionName: "approve",
-                    args: [CONTRACTS.coston2.VaultFactory, MAX_UINT256]
+                    args: [CONTRACTS.arbitrumSepolia.VaultFactory, MAX_UINT256],
+                    // Add gas buffer
+                    gasPrice: BigInt(100000000)
                 }, {
                     onSuccess: (hash) => setTxHash(hash)
                 });
@@ -327,29 +347,33 @@ export default function CreatePersonalVault() {
         }
     };
 
-    const handleFinalize = async (txHashStr: string, vaultAddrOverride?: string) => {
+    const handleFinalize = async (txHashStr: string, vaultAddrOverride?: string, vaultIdOverride?: number) => {
         const targetVault = (vaultAddrOverride || createdVaultAddress) as `0x${string}`;
+        const vaultId = vaultIdOverride;
 
         try {
             await saveVault({
                 vaultAddress: targetVault,
                 owner: address!.toLowerCase(),
-                factoryAddress: CONTRACTS.coston2.VaultFactory,
+                factoryAddress: CONTRACTS.arbitrumSepolia.VaultFactory,
                 createdAt: Date.now(),
                 purpose: formData.purpose,
                 targetAmount: formData.targetAmount || formData.amount,
-                beneficiary: formData.beneficiary || ""
+                beneficiary: formData.beneficiary || "",
+                vaultId: vaultId
             });
 
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
                 vaultAddress: targetVault,
+                factoryAddress: CONTRACTS.arbitrumSepolia.VaultFactory,
                 txHash: txHashStr,
                 timestamp: Date.now(),
                 purpose: formData.purpose,
                 amount: formData.amount,
                 verified: false,
-                type: 'created'
+                type: 'created',
+                vaultId: vaultId
             });
 
             await createNotification(
@@ -357,7 +381,8 @@ export default function CreatePersonalVault() {
                 "Savings Created",
                 `Your Savings "${formData.purpose}" has been successfully secured.`,
                 'success',
-                `/dashboard/savings/${targetVault}`
+                `/dashboard/savings/${targetVault}`,
+                CONTRACTS.arbitrumSepolia.VaultFactory
             );
 
             const unlockDateStr = new Date(unlockDate).toLocaleDateString('en-US', {
@@ -367,7 +392,8 @@ export default function CreatePersonalVault() {
             try {
                 const profile = await getUserProfile(address!);
                 if (profile?.email && (!profile.notificationPreferences || profile.notificationPreferences.deposits)) {
-                    await fetch('/api/notify', {
+                    // Fire and forget - don't block the UI for email delivery
+                    fetch('/api/notify', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -379,10 +405,10 @@ export default function CreatePersonalVault() {
                             unlockDate: unlockDateStr,
                             targetAmount: formData.targetAmount || formData.amount
                         })
-                    });
+                    }).catch(err => console.error("[Email] Delayed error:", err));
                 }
             } catch (emailErr) {
-                console.error("[Email] Error in handleFinalize email flow:", emailErr);
+                console.error("[Email] Error in handleFinalize profile check:", emailErr);
             }
 
             setCurrentStep('done');
@@ -421,8 +447,8 @@ export default function CreatePersonalVault() {
     const isProcessing = currentStep !== 'idle' && currentStep !== 'done';
     const getButtonText = () => {
         if (currentStep === 'creating') return "Creating Savings...";
-        if (currentStep === 'approving') return "Approving USDT0...";
-        if (currentStep === 'generating_proof') return "Finalizing Savings...";
+        if (currentStep === 'approving') return "Approving USDC...";
+        if (currentStep === 'finalizing') return "Finalizing Savings...";
         if (currentStep === 'done') return "Redirecting...";
         return "Create & Lock Funds";
     };
@@ -440,13 +466,26 @@ export default function CreatePersonalVault() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto space-y-4">
+            {/* Email Warning Banner */}
+            {emailChecked && !userEmail && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400">
+                    <Mail className="w-4 h-4 shrink-0" />
+                    <p className="text-xs font-medium flex-1">
+                        No email configured. You won't receive transaction receipts.{" "}
+                        <Link href="/dashboard/settings" className="underline font-bold hover:text-yellow-300">
+                            Add your email in Settings →
+                        </Link>
+                    </p>
+                </div>
+            )}
+
             <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2">
                     <Card className="md:p-8">
                         <div className="mb-8">
                             <h2 className="text-3xl font-bold text-white mb-2">Commit Your Savings</h2>
-                            <p className="text-gray-400">Lock your USDT0 to reach your goals and earn a success bonus upon completion.</p>
+                            <p className="text-gray-400">Lock your USDC to reach your goals and earn a success bonus upon completion.</p>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-6">
@@ -502,10 +541,10 @@ export default function CreatePersonalVault() {
                                             value={formData.amount}
                                             onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                         />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDC</span>
                                     </div>
                                     {balance !== undefined && (
-                                        <p className="text-xs text-gray-500 mt-1">Available: {formatUnits(balance, decimals || 18)} USDT0</p>
+                                        <p className="text-xs text-gray-500 mt-1">Available: {formatUnits(balance, decimals || 18)} USDC</p>
                                     )}
                                 </div>
 
@@ -522,7 +561,7 @@ export default function CreatePersonalVault() {
                                             value={formData.targetAmount}
                                             onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                                         />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDT0</span>
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">USDC</span>
                                     </div>
                                 </div>
                             </div>
@@ -610,10 +649,10 @@ export default function CreatePersonalVault() {
                                 <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 space-y-2">
                                     <div className="flex items-center gap-2">
                                         {currentStep === 'approving' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <Check className="w-4 h-4 text-green-500" />}
-                                        <span className={`text-sm ${currentStep === 'approving' ? 'text-primary font-bold' : 'text-gray-400'}`}>1. Approve USDT0</span>
+                                        <span className={`text-sm ${currentStep === 'approving' ? 'text-primary font-bold' : 'text-gray-400'}`}>1. Approve USDC</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'generating_proof') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
+                                        {currentStep === 'creating' ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : ((currentStep === 'finalizing') ? <Check className="w-4 h-4 text-green-500" /> : <div className="w-4 h-4 rounded-full border border-gray-500" />)}
                                         <span className={`text-sm ${currentStep === 'creating' ? 'text-primary font-bold' : 'text-gray-400'}`}>2. Create & Deposit</span>
                                     </div>
                                 </div>
@@ -639,12 +678,12 @@ export default function CreatePersonalVault() {
                         <div className="space-y-4">
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Locking Amount</p>
-                                <p className="text-2xl font-bold text-white">{formData.amount || "0"} USDT0</p>
+                                <p className="text-2xl font-bold text-white">{formData.amount || "0"} USDC</p>
                             </div>
                             <div className="h-px bg-white/10" />
                             <div>
                                 <p className="text-xs text-gray-500 mb-1">Early Exit Fee</p>
-                                <p className="text-sm font-medium text-red-500">{FIXED_PENALTY}% ({potentialPenalty} USDT0)</p>
+                                <p className="text-sm font-medium text-red-500">{FIXED_PENALTY}% ({potentialPenalty} USDC)</p>
                             </div>
                             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                                 <p className="text-xs text-red-400 flex gap-2">

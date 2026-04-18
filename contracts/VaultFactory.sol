@@ -1,53 +1,58 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./PersonalVault.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/common/ERC2981.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/utils/Base64.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "./PersonalVault.sol";
 
 /**
  * @title VaultFactory
- * @dev Deploys ERC-20 Token (USDT) Vaults.
+ * @dev Deploys Aave-integrated Personal Vaults as NFTs on Arbitrum Sepolia.
  */
-contract VaultFactory is Ownable {
+contract VaultFactory is ERC721, ERC2981, Ownable {
     using SafeERC20 for IERC20;
 
-    address public immutable usdtToken; // USDT token address on Coston2
-    address[] public allVaults;
+    address public immutable usdcToken;
+    address public immutable aavePool; 
+    address public protocolTreasury;
+    address public immutable implementation;
+
+    uint256 public nextVaultId = 1;
+
+    mapping(uint256 => address) public vaultById;
     mapping(address => bool) public isVault;
     mapping(address => address[]) public userVaults;
+    address[] public allVaults;
 
-    address public protocolTreasury;
+    // Config
+    uint96 public constant ROYALTY_BPS = 250; // 2.5%
+    string private _baseTokenURI;
 
-    event PersonalVaultCreated(
-        address indexed vaultAddress, 
-        address indexed owner, 
-        string purpose, 
-        uint256 unlockTime,
-        address beneficiary
-    );
+    event VaultCreated(address indexed user, address vault, uint256 vaultId, string purpose);
 
-    /**
-     * @param _usdtToken Address of USDT token on Coston2
-     * @param _protocolTreasury Address to receive early withdrawal penalties
-     */
-    constructor(address _usdtToken, address _protocolTreasury) Ownable(msg.sender) {
-        require(_usdtToken != address(0), "Invalid USDT address");
-        require(_protocolTreasury != address(0), "Invalid treasury address");
+    constructor(
+        address _usdcToken, 
+        address _aavePool, 
+        address _protocolTreasury,
+        address _implementation
+    ) ERC721("Savique Savings NFT", "SAVI") Ownable(msg.sender) {
+        require(_usdcToken != address(0), "Invalid USDC");
+        require(_implementation != address(0), "Invalid Implementation");
         
-        usdtToken = _usdtToken;
+        usdcToken = _usdcToken;
+        aavePool = _aavePool;
         protocolTreasury = _protocolTreasury;
+        implementation = _implementation;
+
+        _setDefaultRoyalty(_protocolTreasury, ROYALTY_BPS);
     }
 
-    /**
-     * @dev Creates a new personal vault for USDT savings
-     * @param _purpose Description of the vault's purpose
-     * @param _unlockTimestamp Unix timestamp when vault unlocks
-     * @param _penaltyBps Early withdrawal penalty in basis points (e.g., 500 = 5%)
-     * @param _initialDeposit Amount to deposit immediately (requires approval)
-     * @return Address of the newly created vault
-     */
     function createPersonalVault(
         string memory _purpose,
         uint256 _unlockTimestamp,
@@ -55,63 +60,129 @@ contract VaultFactory is Ownable {
         uint256 _initialDeposit,
         address _beneficiary
     ) external returns (address) {
-        PersonalVault vault = new PersonalVault(
-            usdtToken,
+        uint256 vaultId = nextVaultId++;
+        
+        // Clone the implementation (Minimal Proxy)
+        address vaultAddr = Clones.clone(implementation);
+        
+        // Initialize the clone
+        PersonalVault(payable(vaultAddr)).initialize(
+            usdcToken,
+            aavePool,
             _purpose,
-            msg.sender,
             _unlockTimestamp,
             _penaltyBps,
             protocolTreasury,
-            _beneficiary
+            _beneficiary,
+            vaultId
         );
 
-        address vaultAddr = address(vault);
-        allVaults.push(vaultAddr);
-        userVaults[msg.sender].push(vaultAddr);
+        vaultById[vaultId] = vaultAddr;
         isVault[vaultAddr] = true;
+        userVaults[msg.sender].push(vaultAddr);
+        allVaults.push(vaultAddr);
+        
+        _safeMint(msg.sender, vaultId);
 
         if (_initialDeposit > 0) {
-            IERC20(usdtToken).safeTransferFrom(msg.sender, vaultAddr, _initialDeposit);
+            IERC20(usdcToken).safeTransferFrom(msg.sender, address(this), _initialDeposit);
+            IERC20(usdcToken).safeTransfer(vaultAddr, _initialDeposit);
+            PersonalVault(payable(vaultAddr)).depositFromFactory(_initialDeposit);
         }
 
-        emit PersonalVaultCreated(vaultAddr, msg.sender, _purpose, _unlockTimestamp, _beneficiary);
+        emit VaultCreated(msg.sender, vaultAddr, vaultId, _purpose);
         return vaultAddr;
     }
-    
-    /**
-     * @dev Returns all vaults created by this factory
-     */
-    function getAllVaults() external view returns (address[] memory) {
-        return allVaults;
+
+    function setBaseURI(string memory baseURI) external onlyOwner {
+        _baseTokenURI = baseURI;
     }
 
-    /**
-     * @dev Returns all vaults owned by a specific user
-     */
+    function _baseURI() internal view override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        
+        address vault = vaultById[tokenId];
+        string memory purpose = PersonalVault(payable(vault)).purpose();
+        uint256 balance = PersonalVault(payable(vault)).totalAssets();
+        
+        string memory svg = _generateSVG(purpose, balance);
+        string memory tier = _getTier(balance);
+        
+        bytes memory json = abi.encodePacked(
+            '{"name": "Savique ', tier, ' Vault #', Strings.toString(tokenId), '", ',
+            '"description": "A tiered savings vault on Savique Protocol.", ',
+            '"image": "data:image/svg+xml;base64,', Base64.encode(bytes(svg)), '", ',
+            '"attributes": [',
+                '{"trait_type": "Purpose", "value": "', purpose, '"}, ',
+                '{"trait_type": "Tier", "value": "', tier, '"}, ',
+                '{"trait_type": "Balance", "value": "', Strings.toString(balance / 1e6), ' USDC"}',
+            ']}'
+        );
+
+        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(json)));
+    }
+
+    function _getTier(uint256 balance) internal pure returns (string memory) {
+        if (balance >= 10000 * 1e6) return "Platinum";
+        if (balance >= 1000 * 1e6) return "Gold";
+        if (balance >= 100 * 1e6) return "Silver";
+        return "Bronze";
+    }
+
+    function _generateSVG(string memory purpose, uint256 balance) internal pure returns (string memory) {
+        string memory balanceStr = string(abi.encodePacked(Strings.toString(balance / 1e6), " USDC"));
+        string memory tier = _getTier(balance);
+        
+        string memory color = "#cd7f32"; // Bronze
+        string memory stroke = "#E62058";
+        
+        if (keccak256(bytes(tier)) == keccak256(bytes("Platinum"))) {
+            color = "#E5E4E2"; stroke = "#fff";
+        } else if (keccak256(bytes(tier)) == keccak256(bytes("Gold"))) {
+            color = "#FFD700"; stroke = "#FFD700";
+        } else if (keccak256(bytes(tier)) == keccak256(bytes("Silver"))) {
+            color = "#C0C0C0"; stroke = "#C0C0C0";
+        }
+
+        return string(
+            abi.encodePacked(
+                '<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">',
+                '<defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">',
+                '<stop offset="0%" style="stop-color:#18181b;stop-opacity:1" />',
+                '<stop offset="100%" style="stop-color:#09090b;stop-opacity:1" />',
+                '</linearGradient></defs>',
+                '<rect width="400" height="400" rx="24" fill="url(#grad)"/>',
+                '<rect x="10" y="10" width="380" height="380" rx="20" fill="none" stroke="', stroke, '" stroke-width="1" opacity="0.4"/>',
+                '<text x="40" y="70" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="', color, '">SAVIQUE</text>',
+                '<text x="360" y="70" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="', color, '" text-anchor="end">', tier, '</text>',
+                '<rect x="40" y="90" width="40" height="4" fill="', stroke, '"/>',
+                '<text x="40" y="200" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#fff">', purpose, '</text>',
+                '<text x="40" y="240" font-family="Arial, sans-serif" font-size="16" fill="#9ca3af">Total Accumulated</text>',
+                '<text x="40" y="285" font-family="Arial, sans-serif" font-size="38" font-weight="900" fill="#fff">', balanceStr, '</text>',
+                '<text x="40" y="360" font-family="Arial, sans-serif" font-size="12" fill="#4b5563">DECENTRALIZED SAVINGS VAULT</text>',
+                '</svg>'
+            )
+        );
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC2981)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
     function getUserVaults(address _user) external view returns (address[] memory) {
         return userVaults[_user];
     }
 
-    /**
-     * @dev Admin function to trigger beneficiary claim
-     */
     function triggerBeneficiaryClaim(address _vault) external onlyOwner {
         PersonalVault(payable(_vault)).claimByBeneficiary();
-    }
-
-    /**
-     * @dev Executes an auto-deposit by pulling from owner to vault
-     * User must have approved the FACTORY.
-     */
-    function executeAutoDeposit(address _vault, uint256 _amount) external onlyOwner {
-        require(isVault[_vault], "Not a system vault");
-        
-        address vaultOwner = PersonalVault(payable(_vault)).owner();
-        
-        // Factory pulls from user (requires Factory to be spender)
-        IERC20(usdtToken).safeTransferFrom(vaultOwner, _vault, _amount);
-        
-        // Notify vault to record deposit
-        PersonalVault(payable(_vault)).depositFromFactory(_amount);
     }
 }

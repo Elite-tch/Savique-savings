@@ -58,7 +58,7 @@ export default function LeaderboardPage() {
 
     // Fetch Decimals for formatting
     const { data: decimalsResult } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'decimals',
     });
@@ -69,8 +69,8 @@ export default function LeaderboardPage() {
             setDbLoading(true);
             try {
                 const [vData, rData] = await Promise.all([
-                    getAllVaults(),
-                    getAllReceipts()
+                    getAllVaults(CONTRACTS.arbitrumSepolia.VaultFactory),
+                    getAllReceipts(CONTRACTS.arbitrumSepolia.VaultFactory)
                 ]);
                 setSavingsData(vData);
                 setReceiptsData(rData);

@@ -24,7 +24,7 @@ export default function LandingPage() {
                             "price": "0",
                             "priceCurrency": "USD"
                         },
-                        "description": "Smart Commitment Protocol for your capital on Flare Network. Savings with verifiable proofs.",
+                        "description": "Smart Commitment Protocol for your capital on Arbitrum. Savings with verifiable proofs.",
                         "aggregateRating": {
                             "@type": "AggregateRating",
                             "ratingValue": "4.8",
@@ -73,7 +73,7 @@ export default function LandingPage() {
                         </h1>
                         <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
                             Lock funds for specific goals, enforce discipline with smart contracts,
-                            and generate verifiable financial proofs on the Flare Network.
+                            and generate verifiable financial proofs on Arbitrum.
                         </p>
 
                         <div className="flex justify-center md:flex-row flex-col gap-4">
@@ -129,7 +129,7 @@ export default function LandingPage() {
                                 <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                 <div className="text-primary font-bold text-sm uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">Step 02</div>
                                 <h4 className="text-lg font-bold text-white">Lock & Commitment</h4>
-                                <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Deploy funds into your non-custodial vault on Flare.</p>
+                                <p className="text-gray-400 text-sm leading-relaxed group-hover:text-gray-300 transition-colors">Deploy funds into your non-custodial vault on Arbitrum.</p>
                             </motion.div>
 
                             <motion.div
@@ -223,7 +223,7 @@ export default function LandingPage() {
             {/* Footer */}
             <footer className="border-t border-white/5 py-12 mt-16">
                 <div className="container mx-auto px-6 flex justify-center items-center text-gray-500 text-sm">
-                    <p>© {new Date().getFullYear()} Savique. Built on Flare.</p>
+                    <p>© {new Date().getFullYear()} Savique. Built on Arbitrum.</p>
                 </div>
             </footer>
         </div>

@@ -33,7 +33,8 @@ export async function createNotification(
     title: string,
     message: string,
     type: AppNotification['type'] = 'info',
-    link?: string
+    link?: string,
+    factoryAddress?: string
 ) {
     try {
         console.log('[Notification] Creating notification:', { recipient, title, message, type, link });
@@ -44,7 +45,8 @@ export async function createNotification(
             type,
             timestamp: Date.now(),
             read: false,
-            link: link || null
+            link: link || null,
+            factoryAddress: factoryAddress?.toLowerCase() || null
         });
         console.log(`[Notification] Created for ${recipient}: ${title}`);
     } catch (error) {
@@ -84,19 +86,30 @@ export async function markAllAsRead(notificationIds: string[]) {
  */
 export function subscribeToNotifications(
     walletAddress: string,
-    callback: (notifications: AppNotification[]) => void
+    callback: (notifications: AppNotification[]) => void,
+    factoryAddress?: string
 ) {
     const q = query(
         collection(db, NOTIFICATION_COLLECTION),
-        where('recipient', '==', walletAddress.toLowerCase()),
-        orderBy('timestamp', 'desc'),
-        limit(20)
+        where('recipient', '==', walletAddress.toLowerCase())
     );
 
     return onSnapshot(q, (snapshot) => {
         const notifications: AppNotification[] = [];
         snapshot.forEach((doc) => {
             const data = doc.data();
+
+            // Client side filter for factoryAddress
+            if (factoryAddress) {
+                if (data.factoryAddress && data.factoryAddress.toLowerCase() !== factoryAddress.toLowerCase()) {
+                    return;
+                }
+                // Hide legacy notifications that don't have a factoryAddress when on a filtered view
+                if (!data.factoryAddress) {
+                    return;
+                }
+            }
+
             notifications.push({
                 id: doc.id,
                 recipient: data.recipient,
@@ -108,7 +121,11 @@ export function subscribeToNotifications(
                 link: data.link
             });
         });
-        callback(notifications);
+        // Client-side sort and limit
+        const sorted = notifications
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, 20);
+        callback(sorted);
     }, (error) => {
         console.error('[NotificationService] Subscription error:', error);
     });

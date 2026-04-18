@@ -16,14 +16,14 @@ export function InteractiveMockDashboard() {
                         <p className="text-sm text-gray-500">Real-time status of your Savique protocol assets.</p>
                     </div>
                     <div className="bg-primary/20 text-primary px-4 py-2 rounded-full text-xs font-bold border border-primary/20 hidden md:block">
-                        Active Node: Flare Coston2
+                        Active Node: Arbitrum Sepolia
                     </div>
                 </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-4">
                     <MockStatCard
-                        label="USDT0 Balance"
+                        label="USDC Balance"
                         value="12,450.00"
                         icon={Wallet}
                         color="text-green-400"
@@ -114,7 +114,7 @@ function MockStatCard({ label, value, icon: Icon, color, delay, className = "" }
                 </div>
                 <div className="text-2xl font-bold text-white tabular-nums">
                     {label.includes("Locked") || label.includes("Balance") ? "" : ""}{value}
-                    {label.includes("USDT") ? <span className="text-xs text-gray-500 ml-2 font-normal">USDT0</span> : ""}
+                    {label.includes("USDC") ? <span className="text-xs text-gray-500 ml-2 font-normal">USDC</span> : ""}
                     {label.includes("Locked") ? <span className="text-xs text-gray-500 ml-2 font-normal">USD</span> : ""}
                 </div>
             </div>

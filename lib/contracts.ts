@@ -1,10 +1,43 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
-    coston2: {
-        VaultFactory: "0xfB3e3fc852a2178061F44C5FBd6D3b662c278b0d" as `0x${string}`,
-        USDTToken: "0xC1A5B41512496B80903D1f32d6dEa3a73212E71F" as `0x${string}`,
+    arbitrumSepolia: {
+        VaultFactory: "0x85856bFecBe6d46863e2B11A22c1aD58B74A2Ab1" as `0x${string}`,
+        USDCToken: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" as `0x${string}`,
+        AavePool: "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff" as `0x${string}`,
     },
 } as const;
+
+export const AAVE_POOL_ABI = [
+    {
+        inputs: [{ name: "asset", type: "address" }],
+        name: "getReserveData",
+        outputs: [
+            {
+                components: [
+                    { name: "configuration", type: "tuple", components: [{ name: "data", type: "uint256" }] },
+                    { name: "liquidityIndex", type: "uint128" },
+                    { name: "currentLiquidityRate", type: "uint128" },
+                    { name: "variableBorrowIndex", type: "uint128" },
+                    { name: "currentVariableBorrowRate", type: "uint128" },
+                    { name: "currentStableBorrowRate", type: "uint128" },
+                    { name: "lastUpdateTimestamp", type: "uint40" },
+                    { name: "id", type: "uint16" },
+                    { name: "aTokenAddress", type: "address" },
+                    { name: "stableDebtTokenAddress", type: "address" },
+                    { name: "variableDebtTokenAddress", type: "address" },
+                    { name: "interestRateStrategyAddress", type: "address" },
+                    { name: "accruedToTreasury", type: "uint128" },
+                    { name: "unbacked", type: "uint128" },
+                    { name: "isolationModeTotalDebt", type: "uint128" }
+                ],
+                name: "",
+                type: "tuple"
+            }
+        ],
+        stateMutability: "view",
+        type: "function"
+    }
+] as const;
 
 export const VAULT_FACTORY_ABI = [
     {
@@ -22,7 +55,7 @@ export const VAULT_FACTORY_ABI = [
     },
     {
         inputs: [],
-        name: "usdtToken",
+        name: "usdcToken",
         outputs: [{ name: "", type: "address" }],
         stateMutability: "view",
         type: "function"
@@ -64,6 +97,17 @@ export const VAULT_FACTORY_ABI = [
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"
+    },
+    {
+        anonymous: false,
+        inputs: [
+            { indexed: true, name: "user", type: "address" },
+            { indexed: false, name: "vault", type: "address" },
+            { indexed: false, name: "vaultId", type: "uint256" },
+            { indexed: false, name: "purpose", type: "string" }
+        ],
+        name: "VaultCreated",
+        type: "event"
     }
 ] as const;
 

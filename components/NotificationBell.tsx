@@ -5,6 +5,8 @@ import { useAccount } from 'wagmi';
 import { AppNotification, subscribeToNotifications, markAsRead, markAllAsRead } from '@/lib/notificationService';
 import Link from 'next/link';
 
+import { CONTRACTS } from '@/lib/contracts';
+
 export function NotificationBell() {
     const { address } = useAccount();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -29,7 +31,7 @@ export function NotificationBell() {
         const unsubscribe = subscribeToNotifications(address, (data) => {
             console.log('[NotificationBell] Received notifications:', data);
             setNotifications(data);
-        });
+        }, CONTRACTS.arbitrumSepolia.VaultFactory);
         return () => unsubscribe();
     }, [address]);
 

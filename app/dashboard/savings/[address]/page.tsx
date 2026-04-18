@@ -4,13 +4,14 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { VAULT_ABI, ERC20_ABI, CONTRACTS } from "@/lib/contracts";
+import { VAULT_ABI, ERC20_ABI, CONTRACTS, AAVE_POOL_ABI } from "@/lib/contracts";
 import { formatUnits, parseUnits } from "viem";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, Unlock, ArrowLeft, Clock, Wallet, AlertTriangle, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Lock, Unlock, ArrowLeft, Clock, Wallet, AlertTriangle, ShieldCheck, Eye, EyeOff, Zap, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { calculateAccruedInterest } from "@/lib/interestService";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { saveReceipt, getVaultByAddress, SavedVault, updateReceipt, saveVault, getReceiptsByVault, Receipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
@@ -84,6 +85,7 @@ export default function VaultDetailPage() {
     const [topUpStep, setTopUpStep] = useState<'idle' | 'approving' | 'depositing' | 'done'>('idle');
     const [topUpTxHash, setTopUpTxHash] = useState<`0x${string}` | undefined>(undefined);
     const [withdrawalReceipt, setWithdrawalReceipt] = useState<Receipt | null>(null);
+    const [totalPrincipal, setTotalPrincipal] = useState(0);
 
     const [isApprovingVault, setIsApprovingVault] = useState(false);
 
@@ -98,6 +100,17 @@ export default function VaultDetailPage() {
                 const wr = receipts.find(r => r.type === 'completed' || r.type === 'breaked');
                 if (wr) setWithdrawalReceipt(wr);
 
+                // Fallback to target amount if no receipts exist (legacy/failed migration)
+                let principal = receipts
+                    .filter(r => r.type === 'created')
+                    .reduce((sum, r) => sum + parseFloat(r.amount), 0);
+                
+                if (principal === 0 && data?.targetAmount) {
+                    principal = parseFloat(data.targetAmount);
+                }
+                
+                setTotalPrincipal(principal);
+
 
             }
         };
@@ -109,7 +122,7 @@ export default function VaultDetailPage() {
     const { data: balanceResult, refetch: refetchBalance } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
     const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
     const { data: decimals } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'decimals',
     });
@@ -119,7 +132,7 @@ export default function VaultDetailPage() {
 
     // Check Allowance for Top-up
     const { data: allowance, refetch: refetchAllowance } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'allowance',
         args: [userAddress as `0x${string}`, address],
@@ -128,22 +141,44 @@ export default function VaultDetailPage() {
 
     // Balance for Top-up
     const { data: userBalance, refetch: refetchUserBalance } = useReadContract({
-        address: CONTRACTS.coston2.USDTToken,
+        address: CONTRACTS.arbitrumSepolia.USDCToken,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: [userAddress as `0x${string}`],
         query: { enabled: !!userAddress },
     });
 
-    const accruedBonus = useMemo(() => {
-        if (!balanceResult || !vaultData || !decimals) return "0.000";
-        const bal = parseFloat(formatUnits(balanceResult, decimals as number || 18));
-        const now = Date.now();
-        const start = vaultData.createdAt;
-        const elapsedYears = (now - start) / (1000 * 60 * 60 * 24 * 365);
-        // Assuming 10% yield, user gets 10% share = 1% APY effective
-        return (bal * 0.01 * elapsedYears).toFixed(4);
-    }, [balanceResult, vaultData, decimals]);
+    // Read Dynamic Interest Rate from Aave
+    const { data: aaveReserveData } = useReadContract({
+        address: CONTRACTS.arbitrumSepolia.AavePool,
+        abi: AAVE_POOL_ABI,
+        //@ts-ignore - complex tuple return
+        functionName: 'getReserveData',
+        args: [CONTRACTS.arbitrumSepolia.USDCToken],
+    });
+
+    const dynamicApy = useMemo(() => {
+        if (!aaveReserveData) return 0.0162;
+        // currentLiquidityRate is index 2 in the struct, or reachable via property
+        // For Aave V3, ray = 1e27
+        const rate = Number((aaveReserveData as any).currentLiquidityRate) / 1e27;
+        return rate;
+    }, [aaveReserveData]);
+
+    const accruedInterest = useMemo(() => {
+        if (!balanceResult || !decimals) return "0.000000";
+        
+        // currentBalance includes principal + interest
+        const currentBalance = parseFloat(formatUnits(balanceResult as bigint, decimals as number || 18));
+        
+        // Interest is the difference
+        const rawInterest = Math.max(0, currentBalance - totalPrincipal);
+        
+        // Professional "Net Display": Only show the 80% that belongs to the user
+        const userInterest = rawInterest * 0.8;
+        
+        return userInterest.toFixed(6);
+    }, [balanceResult, decimals, totalPrincipal]);
 
     // Brand Styled Toast
     const toastStyle = {
@@ -311,12 +346,13 @@ export default function VaultDetailPage() {
                     : `Withdrawal: ${purpose}`;
 
                 try {
-                    console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Finalizing ${amountToSave} USDT0...`);
+                    console.log(`[${isDeposit ? 'Deposit' : 'Withdraw'}] Finalizing ${amountToSave} USDC...`);
 
                     // 1. Save Receipt to Firestore
                     await saveReceipt({
                         walletAddress: userAddress!.toLowerCase(),
                         vaultAddress: address,
+                        factoryAddress: CONTRACTS.arbitrumSepolia.VaultFactory,
                         txHash: receipt.transactionHash,
                         timestamp: Date.now(),
                         purpose: customPurpose,
@@ -333,7 +369,8 @@ export default function VaultDetailPage() {
                             ? `Successfully added ${amountToSave} to your "${purpose}" savings.`
                             : `Successfully withdrew funds from your "${purpose}" savings.`,
                         'success',
-                        isDeposit ? `/dashboard/savings/${address}` : '/dashboard/history'
+                        isDeposit ? `/dashboard/savings/${address}` : '/dashboard/history',
+                        CONTRACTS.arbitrumSepolia.VaultFactory
                     );
 
                     // 3. Send Professional Email Notification
@@ -405,6 +442,7 @@ export default function VaultDetailPage() {
                 address,
                 abi: VAULT_ABI,
                 functionName: "withdraw",
+                gasPrice: BigInt(100000000)
             });
         } catch (error) {
             console.error(error);
@@ -433,16 +471,17 @@ export default function VaultDetailPage() {
             if (!bypassAllowance && (!allowance || (allowance as bigint) < amountUnits)) {
                 setTopUpStep('approving');
                 if (toastId.current) toast.dismiss(toastId.current);
-                toastId.current = toast.loading("Approving USDT...", toastStyle);
+                toastId.current = toast.loading("Approving USDC...", toastStyle);
                 writeContract({
-                    address: CONTRACTS.coston2.USDTToken,
+                    address: CONTRACTS.arbitrumSepolia.USDCToken,
                     abi: ERC20_ABI,
                     functionName: "approve",
-                    args: [address, BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935")]
+                    args: [address, BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935")],
+                    gasPrice: BigInt(100000000)
                 });
             } else {
                 setTopUpStep('depositing');
-                const msg = "Depositing USDT...";
+                const msg = "Depositing USDC...";
                 if (toastId.current) {
                     toast.loading(msg, { ...toastStyle, id: toastId.current });
                 } else {
@@ -452,7 +491,8 @@ export default function VaultDetailPage() {
                     address,
                     abi: VAULT_ABI,
                     functionName: "deposit",
-                    args: [amountUnits]
+                    args: [amountUnits],
+                    gasPrice: BigInt(100000000)
                 });
                 // Ensure allowance is refreshed after we've used it
                 refetchAllowance();
@@ -560,6 +600,21 @@ export default function VaultDetailPage() {
                                         {<span className="text-zinc-500">{countdown.seconds.toString().padStart(2, '0')}<span className="text-lg text-zinc-600 ml-1">s</span></span>}
                                     </div>
                                     <p className="text-sm text-zinc-500">Until {unlockDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                    
+                                    {vaultData?.vaultId && (
+                                        <div className="pt-4">
+                                            <a 
+                                                href={`https://testnets.opensea.io/assets/arbitrum-sepolia/${CONTRACTS.arbitrumSepolia.VaultFactory}/${vaultData.vaultId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                <Button variant="outline" size="sm" className="bg-white/5 border-white/10 hover:bg-white/10 text-[10px] h-8 px-4 rounded-full">
+                                                    <Zap className="w-3 h-3 mr-2 text-blue-400" />
+                                                    View on OpenSea (Testnet)
+                                                </Button>
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Progress Bar */}
@@ -617,20 +672,35 @@ export default function VaultDetailPage() {
                                         {parseFloat(balance) > 0
                                             ? parseFloat(balance).toFixed(2)
                                             : (withdrawalReceipt ? withdrawalReceipt.amount : "0.00")
-                                        } <span className="text-sm font-normal text-zinc-500">USDT0</span>
+                                        } <span className="text-sm font-normal text-zinc-500">USDC</span>
                                     </h3>
 
                                     {/* Penalty Indicator for Broken Vaults */}
                                     {withdrawalReceipt?.penalty && parseFloat(withdrawalReceipt.penalty) > 0 && (
                                         <div className="flex items-center gap-2 text-red-500/80 text-[10px] font-bold uppercase tracking-wider">
                                             <AlertTriangle className="w-3 h-3" />
-                                            Penalty Applied: -{withdrawalReceipt.penalty} USDT0
+                                            Penalty Applied: -{withdrawalReceipt.penalty} USDC
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
                     </Card>
+
+                    {/* Interest Card */}
+                    {parseFloat(balance) > 0 && (
+                        <Card className="p-6 bg-zinc-900/50 border-white/5 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors" />
+                            <div className="flex items-center gap-3 mb-4">
+                                
+                                <p className="text-xs text-zinc-500 font-bold uppercase tracking-tight">Accrued Interest</p>
+                            </div>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-black text-white">{accruedInterest}</span>
+                                <span className="text-xs text-zinc-500">USDC</span>
+                            </div>
+                        </Card>
+                    )}
 
                     {/* Motivation Card */}
                     <Card className="p-6 bg-primary/5 border-primary/20">
@@ -673,7 +743,7 @@ export default function VaultDetailPage() {
                                                     <div className="flex justify-between text-xs">
                                                         <span className="text-zinc-500">Amount to Add</span>
                                                         {userBalance !== undefined && (
-                                                            <span className="text-zinc-400">Bal: {formatUnits(userBalance as bigint, decimals as number || 18)} USDT0</span>
+                                                            <span className="text-zinc-400">Bal: {formatUnits(userBalance as bigint, decimals as number || 18)} USDC</span>
                                                         )}
                                                     </div>
                                                     <div className="relative">

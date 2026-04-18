@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
     return {
         name: 'Savique | Secure Crypto Savings',
         short_name: 'Savique',
-        description: 'Smart purpose-driven Savings secured on the Flare Network',
+        description: 'Smart purpose-driven Savings secured on Arbitrum',
         start_url: '/',
         display: 'standalone',
         background_color: '#000000',

@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet, Download, FileText, Loader2 } from "lucide-react";
+import { Receipt as ReceiptIcon, ExternalLink, CheckCircle, Calendar, Clock, Wallet, Download, FileText, Loader2, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
-import { toast } from "sonner";
+import { CONTRACTS } from "@/lib/contracts";
 
 export default function HistoryPage() {
     const { address: currentAddress, isConnected, isConnecting, isReconnecting } = useAccount();
@@ -29,7 +29,7 @@ export default function HistoryPage() {
                 setIsLoading(true);
                 console.log("[History] Loading receipts from Firestore for:", currentAddress);
 
-                const fetchedReceipts = await getReceiptsByWallet(currentAddress);
+                const fetchedReceipts = await getReceiptsByWallet(currentAddress, CONTRACTS.arbitrumSepolia.VaultFactory);
                 setReceipts(fetchedReceipts);
 
                 console.log("[History] Loaded receipts:", fetchedReceipts.length);
@@ -46,7 +46,7 @@ export default function HistoryPage() {
     }, [currentAddress]);
 
     const viewOnExplorer = (txHash: string) => {
-        window.open(`https://coston2-explorer.flare.network/tx/${txHash}`, '_blank');
+        window.open(`https://sepolia.arbiscan.io/tx/${txHash}`, '_blank');
     };
 
     if (!isConnected) {
@@ -140,7 +140,7 @@ export default function HistoryPage() {
                                     <div className="flex flex-col md:items-end gap-3">
                                         <div className="text-left md:text-right">
                                             <p className="text-xs text-gray-500 mb-1">Amount</p>
-                                            <p className="text-lg font-bold text-white">{receipt.amount} USDT0</p>
+                                            <p className="text-lg font-bold text-white">{receipt.amount} USDC</p>
                                             {receipt.penalty && (
                                                 <p className="text-xs text-red-500 font-medium mt-1">
                                                     -{receipt.penalty} Penalty
@@ -157,6 +157,23 @@ export default function HistoryPage() {
                                                 <ExternalLink className="w-3 h-3" />
                                                 Explorer
                                             </Button>
+
+                                            {receipt.vaultId && (
+                                                <a
+                                                    href={`https://testnets.opensea.io/assets/arbitrum-sepolia/${CONTRACTS.arbitrumSepolia.VaultFactory}/${receipt.vaultId}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                >
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="gap-2 border-blue-500/20 text-blue-400 hover:bg-blue-500/5 hover:text-blue-300"
+                                                    >
+                                                        <Zap className="w-3 h-3" />
+                                                        Marketplace
+                                                    </Button>
+                                                </a>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
