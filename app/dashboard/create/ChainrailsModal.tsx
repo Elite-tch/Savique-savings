@@ -23,7 +23,7 @@ export const ChainrailsModal: React.FC<ChainrailsModalProps> = ({ open, onClose,
   const createSession = async () => {
     try {
       if (onLoadingChange) onLoadingChange(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/create-session`, {
+      const res = await fetch(`/api/create-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
