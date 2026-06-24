@@ -15,7 +15,7 @@ import {
     Lock
 } from "lucide-react";
 import { usePublicClient } from "wagmi";
-import { VAULT_ABI } from "@/lib/contracts";
+import { PRIVATE_SAVINGS_POOL_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { toast } from "sonner";
 
@@ -45,21 +45,18 @@ export default function ActiveSavingsPage() {
 
                     await Promise.all(v.map(async (vault) => {
                         try {
-                            const [bal, exp] = await Promise.all([
-                                publicClient.readContract({
-                                    address: vault.vaultAddress as `0x${string}`,
-                                    abi: VAULT_ABI,
-                                    functionName: 'totalAssets'
-                                }),
-                                publicClient.readContract({
-                                    address: vault.vaultAddress as `0x${string}`,
-                                    abi: VAULT_ABI,
-                                    functionName: 'unlockTimestamp'
-                                })
-                            ]);
-                            balances[vault.vaultAddress] = parseFloat(formatUnits(bal as bigint, 6));
-                            expirations[vault.vaultAddress] = Number(exp) * 1000;
-                        } catch (e) { }
+                            const vaultDetails = await publicClient.readContract({
+                                address: CONTRACTS.arbitrumSepolia.VaultFactory,
+                                abi: PRIVATE_SAVINGS_POOL_ABI,
+                                functionName: 'getVaultDetails',
+                                args: [vault.owner as `0x${string}`, BigInt(vault.vaultAddress)]
+                            });
+                            
+                            balances[vault.vaultAddress] = vault.currentTotal || 0; // Fallback to DB since FHE is private
+                            expirations[vault.vaultAddress] = Number(vaultDetails[0]) * 1000;
+                        } catch (e) {
+                            console.error(`Error reading details for vault ${vault.vaultAddress}:`, e);
+                        }
                     }));
                     setVaultBalances(balances);
                     setVaultExpirations(expirations);
@@ -138,7 +135,7 @@ export default function ActiveSavingsPage() {
                                         </td>
                                         <td className="px-6 py-4 font-mono text-gray-400 text-xs">{vault.owner}</td>
                                         <td className="px-6 py-4 text-right font-bold text-emerald-400">
-                                            {vaultBalances[vault.vaultAddress]?.toFixed(2) || "0.00"} USDT
+                                            Private
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex flex-col items-end">
@@ -153,7 +150,7 @@ export default function ActiveSavingsPage() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="h-8 w-8 p-0"
-                                                onClick={() => window.open(`https://sepolia.arbiscan.io/address/${vault.vaultAddress}`, '_blank')}
+                                                onClick={() => window.open(`https://sepolia.arbiscan.io/address/${CONTRACTS.arbitrumSepolia.VaultFactory}`, '_blank')}
                                             >
                                                 <ExternalLink size={14} />
                                             </Button>

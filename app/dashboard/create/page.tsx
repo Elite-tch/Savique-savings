@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useWriteContract, useWaitForTransactionReceipt, useAccount, useBalance, useReadContract, usePublicClient } from "wagmi";
-import { CONTRACTS, VAULT_FACTORY_ABI, ERC20_ABI, VAULT_ABI } from "@/lib/contracts";
+import { CONTRACTS, PRIVATE_SAVINGS_POOL_ABI, ERC20_ABI } from "@/lib/contracts";
 import { toast } from "sonner";
 import { parseUnits, formatUnits, decodeEventLog } from "viem";
 import { saveReceipt, saveVault } from "@/lib/receiptService";
@@ -131,9 +131,9 @@ export default function CreatePersonalVault() {
     const toastId = useRef<string | number | null>(null);
 
     // Multi-step state
-    type Step = 'idle' | 'approving' | 'creating' | 'finalizing' | 'done';
+    type Step = 'idle' | 'approving' | 'creating' | 'depositing' | 'finalizing' | 'done';
     const [currentStep, setCurrentStep] = useState<Step>('idle');
-    const [createdVaultAddress, setCreatedVaultAddress] = useState<`0x${string}`>();
+    const [createdVaultId, setCreatedVaultId] = useState<string>();
     const [isFiatLoading, setIsFiatLoading] = useState(false);
     const [txHash, setTxHash] = useState<`0x${string}` | undefined>(undefined);
 
@@ -173,45 +173,51 @@ export default function CreatePersonalVault() {
                     toast.dismiss(toastId.current as string);
 
                     try {
-                        let newVault: string | undefined;
+                        let newVaultId: string | undefined;
                         for (const log of receipt.logs) {
                             try {
                                 const decoded = decodeEventLog({
-                                    abi: VAULT_FACTORY_ABI,
+                                    abi: PRIVATE_SAVINGS_POOL_ABI,
                                     data: log.data,
                                     topics: log.topics
                                 });
                                 if (decoded.eventName === 'VaultCreated') {
-                                    newVault = (decoded.args as any).vault;
+                                    newVaultId = (decoded.args as any).vaultId.toString();
                                     break;
                                 }
                             } catch (e) { }
                         }
 
-                        if (!newVault) {
-                            const userVaults = await publicClient!.readContract({
+                        if (!newVaultId) {
+                            const vaultCount = await publicClient!.readContract({
                                 address: CONTRACTS.arbitrumSepolia.VaultFactory,
-                                abi: VAULT_FACTORY_ABI,
-                                functionName: 'getUserVaults',
+                                abi: PRIVATE_SAVINGS_POOL_ABI,
+                                functionName: 'userVaultCount',
                                 args: [address!]
                             });
-                            newVault = userVaults[userVaults.length - 1];
+                            newVaultId = (Number(vaultCount) - 1).toString();
                         }
 
-                        if (newVault) {
-                            setCreatedVaultAddress(newVault as `0x${string}`);
-                            toast.success("Savings Created!", toastStyle);
+                        if (newVaultId && Number(newVaultId) >= 0) {
+                            setCreatedVaultId(newVaultId);
+                            toast.success("Goal Created! Now Depositing...", toastStyle);
                             setTxHash(undefined);
-                            setCurrentStep('finalizing');
-                            handleFinalize(receipt.transactionHash, newVault);
+                            setCurrentStep('depositing');
+                            triggerDeposit(newVaultId);
                         } else {
-                            throw new Error("Could not find new savings address");
+                            throw new Error("Could not find new savings ID");
                         }
                     } catch (e) {
                         console.error("Error finding new vault:", e);
-                        toast.error("Created but failed to find address", toastStyle);
+                        toast.error("Created but failed to find ID", toastStyle);
                         setCurrentStep('idle');
                     }
+                } else if (currentStep === 'depositing') {
+                    toast.dismiss(toastId.current as string);
+                    toast.success("Deposit Successful!", toastStyle);
+                    setTxHash(undefined);
+                    setCurrentStep('finalizing');
+                    handleFinalize(receipt.transactionHash, createdVaultId);
                 }
             }
         };
@@ -305,17 +311,32 @@ export default function CreatePersonalVault() {
 
         writeContract({
             address: CONTRACTS.arbitrumSepolia.VaultFactory,
-            abi: VAULT_FACTORY_ABI,
-            functionName: "createPersonalVault",
+            abi: PRIVATE_SAVINGS_POOL_ABI,
+            functionName: "createVault",
             args: [
                 formData.purpose,
                 BigInt(unlockTimestamp),
-                BigInt(penaltyBps),
-                amountUnits,
-                (formData.beneficiary || "0x0000000000000000000000000000000000000000") as `0x${string}`
+                BigInt(penaltyBps)
             ],
-            // Add gas buffer for Arbitrum Sepolia
-            gasPrice: BigInt(100000000) // 0.1 Gwei - very safe for testnet
+            gasPrice: BigInt(100000000)
+        }, {
+            onSuccess: (hash) => setTxHash(hash)
+        });
+    };
+
+    const triggerDeposit = (vaultId: string) => {
+        const amountUnits = parseUnits(formData.amount, decimals || 18);
+
+        toastId.current = toast.loading("Depositing to Vault...", toastStyle);
+        writeContract({
+            address: CONTRACTS.arbitrumSepolia.VaultFactory,
+            abi: PRIVATE_SAVINGS_POOL_ABI,
+            functionName: "deposit",
+            args: [
+                BigInt(vaultId),
+                amountUnits
+            ],
+            gasPrice: BigInt(100000000)
         }, {
             onSuccess: (hash) => setTxHash(hash)
         });
@@ -358,12 +379,13 @@ export default function CreatePersonalVault() {
         }
     };
 
-    const handleFinalize = async (txHashStr: string, vaultAddrOverride?: string) => {
-        const targetVault = (vaultAddrOverride || createdVaultAddress) as `0x${string}`;
+    const handleFinalize = async (txHashStr: string, vaultIdOverride?: string) => {
+        const targetVaultId = vaultIdOverride || createdVaultId;
+        if (!targetVaultId) return;
 
         try {
             await saveVault({
-                vaultAddress: targetVault,
+                vaultAddress: targetVaultId,
                 owner: address!.toLowerCase(),
                 factoryAddress: CONTRACTS.arbitrumSepolia.VaultFactory,
                 createdAt: Date.now(),
@@ -374,7 +396,7 @@ export default function CreatePersonalVault() {
 
             await saveReceipt({
                 walletAddress: address!.toLowerCase(),
-                vaultAddress: targetVault,
+                vaultAddress: targetVaultId,
                 factoryAddress: CONTRACTS.arbitrumSepolia.VaultFactory,
                 txHash: txHashStr,
                 timestamp: Date.now(),
@@ -389,7 +411,7 @@ export default function CreatePersonalVault() {
                 "Savings Created",
                 `Your Savings "${formData.purpose}" has been successfully secured.`,
                 'success',
-                `/dashboard/savings/${targetVault}`,
+                `/dashboard/savings/${targetVaultId}`,
                 CONTRACTS.arbitrumSepolia.VaultFactory
             );
 
@@ -454,8 +476,9 @@ export default function CreatePersonalVault() {
 
     const isProcessing = currentStep !== 'idle' && currentStep !== 'done';
     const getButtonText = () => {
-        if (currentStep === 'creating') return "Creating Savings...";
         if (currentStep === 'approving') return "Approving USDC...";
+        if (currentStep === 'creating') return "Creating Savings Goal...";
+        if (currentStep === 'depositing') return "Depositing Funds...";
         if (currentStep === 'finalizing') return "Finalizing Savings...";
         if (currentStep === 'done') return "Redirecting...";
         return "Create & Lock Funds";

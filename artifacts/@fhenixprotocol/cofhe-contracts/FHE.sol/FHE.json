@@ -1,0 +1,10 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "FHE",
+  "sourceName": "@fhenixprotocol/cofhe-contracts/FHE.sol",
+  "abi": [],
+  "bytecode": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea26469706673582212203e55a8daab0d79257b0a1e792ab57669523df9079d9ccd13fe03b27d5b02712064736f6c634300081b0033",
+  "deployedBytecode": "0x600080fdfea26469706673582212203e55a8daab0d79257b0a1e792ab57669523df9079d9ccd13fe03b27d5b02712064736f6c634300081b0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

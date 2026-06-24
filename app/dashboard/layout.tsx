@@ -14,7 +14,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { getUserVaultsFromDb } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { usePublicClient } from "wagmi";
-import { CONTRACTS, VAULT_ABI } from "@/lib/contracts";
+import { CONTRACTS, PRIVATE_SAVINGS_POOL_ABI } from "@/lib/contracts";
 
 function useDeadlinePulse(address?: string) {
     const publicClient = usePublicClient();
@@ -32,13 +32,14 @@ function useDeadlinePulse(address?: string) {
 
                 for (const vaultAddr of vaults) {
                     try {
-                        const unlockTime = await publicClient.readContract({
-                            address: vaultAddr as `0x${string}`,
-                            abi: VAULT_ABI,
-                            functionName: "unlockTimestamp"
+                        const vaultDetails = await publicClient.readContract({
+                            address: CONTRACTS.arbitrumSepolia.VaultFactory,
+                            abi: PRIVATE_SAVINGS_POOL_ABI,
+                            functionName: "getVaultDetails",
+                            args: [address as `0x${string}`, BigInt(vaultAddr)]
                         });
 
-                        const unlockDate = new Date(Number(unlockTime) * 1000);
+                        const unlockDate = new Date(Number(vaultDetails[0]) * 1000);
                         const now = new Date();
                         const diffHours = (unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 

@@ -7,10 +7,11 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { formatUnits } from "viem";
-import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
+import { CONTRACTS, ERC20_ABI } from "@/lib/contracts";
 import { useState, useEffect } from "react";
 import { VaultPreviewCard } from "@/components/VaultPreviewCard";
 import { useContractAddresses } from "@/hooks/useContractAddresses";
+import { PRIVATE_SAVINGS_POOL_ABI } from "@/lib/contracts";
 import { Input } from "@/components/ui/input";
 import { getUserVaultsFromDb, saveVault } from "@/lib/receiptService";
 import { usePublicClient } from "wagmi";
@@ -93,13 +94,17 @@ export default function Dashboard() {
                     // 2. Get Chain Vaults
                     let chainVaults: string[] = [];
                     try {
-                        const rawChainVaults = await publicClient.readContract({
+                        const count = await publicClient.readContract({
                             address: factoryAddress,
-                            abi: VAULT_FACTORY_ABI,
-                            functionName: "getUserVaults",
+                            abi: PRIVATE_SAVINGS_POOL_ABI,
+                            functionName: "userVaultCount",
                             args: [address]
                         });
-                        chainVaults = [...rawChainVaults].reverse();
+                        // vaultIds are numbers from 0 to count-1, stored as strings for UI compatibility
+                        for(let i = 0; i < Number(count); i++) {
+                            chainVaults.push(i.toString());
+                        }
+                        chainVaults = chainVaults.reverse();
                     } catch (err) {
                         console.warn("Failed to fetch chain vaults", err);
                     }
@@ -139,85 +144,21 @@ export default function Dashboard() {
 
     const vaultCount = vaultAddresses?.length || 0;
 
-    // Read balances from all vaults
-    const vaultBalanceContracts = (vaultAddresses || []).map((vaultAddr) => ({
-        address: vaultAddr as `0x${string}`,
-        abi: VAULT_ABI,
-        functionName: 'totalAssets' as const,
-    }));
+    // Removed batch reading of totalAssets and unlockTimestamp because FHE balances are private.
+    // Instead of querying on-chain, we rely on VaultPreviewCard for individual vaults.
 
-    const { data: vaultBalances, isLoading: isBalancesLoading } = useReadContracts({
-        contracts: vaultBalanceContracts,
-        query: {
-            enabled: vaultCount > 0
-        }
-    });
+    const isBalancesLoading = loadingVaults;
 
-    // Read unlock timestamps from all vaults
-    const vaultUnlockContracts = (vaultAddresses || []).map((vaultAddr) => ({
-        address: vaultAddr as `0x${string}`,
-        abi: VAULT_ABI,
-        functionName: 'unlockTimestamp' as const,
-    }));
+    // We can't calculate total locked on-chain due to FHE encryption.
+    useEffect(() => {
+        setTotalLocked("Private");
+    }, []);
 
-    const { data: unlockTimestamps } = useReadContracts({
-        contracts: vaultUnlockContracts,
-        query: {
-            enabled: vaultCount > 0
-        }
-    });
-
-    // Calculate completed vaults (unlocked)
-    const completedCount = (unlockTimestamps || []).filter((result) => {
-        if (result.status === 'success' && result.result) {
-            const unlockTime = Number(result.result) * 1000;
-            return Date.now() >= unlockTime;
-        }
-        return false;
-    }).length;
+    const calculatedActiveCount = vaultAddresses?.length || 0;
+    const calculatedCompletedCount = 0; // Not computable without individual decrypts
 
     // Get the 3 most recent vaults regardless of balance or status
     const recentVaults = (vaultAddresses || []).slice(0, 3);
-
-    // Calculate Active and Completed vaults based on balance
-    let activeVaultCount = 0;
-
-    // Calculate total locked and active count
-    useEffect(() => {
-        if (!vaultBalances || vaultBalances.length === 0) {
-            setTotalLocked("0.00");
-            return;
-        }
-
-        let total = BigInt(0);
-        let active = 0;
-
-        vaultBalances.forEach((result) => {
-            if (result.status === 'success' && result.result) {
-                const bal = result.result as bigint;
-                total += bal;
-                if (bal > BigInt(0)) active++;
-            }
-        });
-
-        setTotalLocked(parseFloat(formatUnits(total, decimals || 18)).toFixed(2));
-        // We can't update a local variable 'activeVaultCount' here to trigger re-render of stats, 
-        // so we need a state or calculate it in render body if possible.
-        // Actually, since vaultBalances is data, we can calculate derived state in render body.
-    }, [vaultBalances, decimals]);
-
-    // Derived state calculation from data
-    const activeInfo = (vaultBalances || []).reduce((acc, result) => {
-        if (result.status === 'success' && result.result) {
-            if ((result.result as bigint) > BigInt(0)) {
-                return acc + 1;
-            }
-        }
-        return acc;
-    }, 0);
-
-    const calculatedActiveCount = vaultBalances ? activeInfo : 0;
-    const calculatedCompletedCount = (vaultAddresses?.length || 0) - calculatedActiveCount;
 
     const formattedBalance = isConnected && balance
         ? parseFloat(formatUnits(balance as bigint, decimals || 18)).toFixed(2)
@@ -240,7 +181,7 @@ export default function Dashboard() {
         },
         {
             label: "Total Locked",
-            value: `$ ${totalLocked} `,
+            value: totalLocked,
             icon: TrendingUp,
             color: "text-purple-400",
             isPrivacy: true

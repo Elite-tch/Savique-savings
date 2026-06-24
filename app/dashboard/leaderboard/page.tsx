@@ -15,8 +15,8 @@ import {
     History
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useReadContracts, useReadContract, useAccount } from "wagmi";
-import { VAULT_ABI, CONTRACTS, ERC20_ABI } from "@/lib/contracts";
+import { useReadContract, useAccount } from "wagmi";
+import { CONTRACTS, ERC20_ABI } from "@/lib/contracts";
 import { getAllVaults, SavedVault, getAllReceipts, Receipt } from "@/lib/receiptService";
 import { formatUnits } from "viem";
 import { Input } from "@/components/ui/input";
@@ -83,25 +83,7 @@ export default function LeaderboardPage() {
         fetchInitialData();
     }, []);
 
-    const contracts = useMemo(() => {
-        const calls: any[] = [];
-        savingsData.forEach(s => {
-            if (s.vaultAddress?.startsWith('0x')) {
-                calls.push({ address: s.vaultAddress as `0x${string}`, abi: VAULT_ABI, functionName: 'totalAssets' });
-            }
-        });
-        return calls;
-    }, [savingsData]);
-
-    const { data: results, isLoading: chainLoading } = useReadContracts({
-        contracts,
-        query: {
-            enabled: savingsData.length > 0,
-            refetchInterval: 30000
-        }
-    });
-
-    const loading = dbLoading || (savingsData.length > 0 && chainLoading);
+    const loading = dbLoading;
 
     const allUsersStats = useMemo(() => {
         if (!savingsData.length && !receiptsData.length) return [];
@@ -120,12 +102,10 @@ export default function LeaderboardPage() {
 
             if (!userMap[owner]) userMap[owner] = { currentTVL: 0, totalTVL: 0, totalCount: 0 };
             userMap[owner].totalCount++;
-
-            if (results && results[i]) {
-                const assetRes = results[i];
-                const assets = assetRes?.status === 'success' ? parseFloat(formatUnits(assetRes.result as bigint, decimals)) : 0;
-                userMap[owner].currentTVL += assets;
-            }
+            
+            // In FHE Private app, currentTVL is hidden on-chain.
+            // We use DB recorded currentTotal as estimate or keep it private.
+            userMap[owner].currentTVL += (s.currentTotal || 0);
         });
 
         // 2. Process Total TVL (Lifetime Journey)
@@ -161,7 +141,7 @@ export default function LeaderboardPage() {
             const level = BADGE_LEVELS.find(lvl => stat.totalTVL >= lvl.minTotal) || BADGE_LEVELS[BADGE_LEVELS.length - 1];
             return { ...stat, rank, rankLabel: level.tier, rankColor: level.color, badgeIcon: level.icon };
         });
-    }, [savingsData, results, receiptsData, decimals]);
+    }, [savingsData, receiptsData, decimals]);
 
     const filteredStats = useMemo(() => {
         const list = searchQuery
@@ -264,7 +244,7 @@ export default function LeaderboardPage() {
                                         </td>
                                         <td className="px-8 py-4 text-center whitespace-nowrap">
                                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 text-primary border border-primary/20 font-bold hover:bg-primary/10 transition-all">
-                                                ${user.currentTVL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                Private
                                             </div>
                                         </td>
                                         <td className="px-8 py-4 text-center whitespace-nowrap">

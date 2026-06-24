@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-chai-matchers";
+import "fhenix-hardhat-plugin";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -8,7 +9,7 @@ dotenv.config(); // Fallback to .env if both exist
 
 const config: HardhatUserConfig = {
     solidity: {
-        version: "0.8.20",
+        version: "0.8.27",
         settings: {
             viaIR: true,
             optimizer: {

@@ -1,7 +1,7 @@
 // -------------------- Config --------------------
 export const CONTRACTS = {
     arbitrumSepolia: {
-        VaultFactory: "0x059652D26C7653278896D3DF7286EAaDE7a60b15" as `0x${string}`,
+        VaultFactory: "0xE142f08E04B963f22397eE36b8BcE184c05c0875" as `0x${string}`, // CoFHE v2
         USDCToken: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d" as `0x${string}`,
         AavePool: "0xBfC91D59fdAA134A4ED45f7B584cAf96D7792Eff" as `0x${string}`,
     },
@@ -39,148 +39,103 @@ export const AAVE_POOL_ABI = [
     }
 ] as const;
 
-export const VAULT_FACTORY_ABI = [
+export const PRIVATE_SAVINGS_POOL_ABI = [
     {
         inputs: [
-            { name: "_purpose", type: "string" },
+            { name: "purpose", type: "string" },
             { name: "_unlockTimestamp", type: "uint256" },
-            { name: "_penaltyBps", type: "uint256" },
-            { name: "_initialDeposit", type: "uint256" },
-            { name: "_beneficiary", type: "address" }
+            { name: "_penaltyBps", type: "uint256" }
         ],
-        name: "createPersonalVault",
-        outputs: [{ name: "", type: "address" }],
-        stateMutability: "nonpayable",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "usdcToken",
-        outputs: [{ name: "", type: "address" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [{ name: "user", type: "address" }],
-        name: "getUserVaults",
-        outputs: [{ name: "", type: "address[]" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "getAllVaults",
-        outputs: [{ name: "", type: "address[]" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "owner",
-        outputs: [{ name: "", type: "address" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [{ name: "_vault", type: "address" }],
-        name: "triggerBeneficiaryClaim",
-        outputs: [],
+        name: "createVault",
+        outputs: [{ name: "", type: "uint256" }],
         stateMutability: "nonpayable",
         type: "function"
     },
     {
         inputs: [
-            { name: "_vault", type: "address" },
-            { name: "_amount", type: "uint256" }
+            { name: "vaultId", type: "uint256" },
+            { name: "amount", type: "uint256" }
         ],
-        name: "executeAutoDeposit",
-        outputs: [],
-        stateMutability: "nonpayable",
-        type: "function"
-    },
-    {
-        anonymous: false,
-        inputs: [
-            { indexed: true, name: "user", type: "address" },
-            { indexed: false, name: "vault", type: "address" },
-            { indexed: false, name: "vaultId", type: "uint256" },
-            { indexed: false, name: "purpose", type: "string" }
-        ],
-        name: "VaultCreated",
-        type: "event"
-    }
-] as const;
-
-export const VAULT_ABI = [
-    {
-        inputs: [],
-        name: "purpose",
-        outputs: [{ name: "", type: "string" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "totalAssets",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "unlockTimestamp",
-        outputs: [{ name: "", type: "uint256" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [],
-        name: "token",
-        outputs: [{ name: "", type: "address" }],
-        stateMutability: "view",
-        type: "function"
-    },
-    {
-        inputs: [{ name: "amount", type: "uint256" }],
         name: "deposit",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"
     },
     {
-        inputs: [],
+        inputs: [
+            { name: "vaultId", type: "uint256" },
+            { name: "sharesToWithdraw", type: "uint256" }
+        ],
         name: "withdraw",
         outputs: [],
         stateMutability: "nonpayable",
         type: "function"
     },
     {
-        inputs: [],
-        name: "beneficiary",
-        outputs: [{ name: "", type: "address" }],
+        inputs: [
+            { name: "user", type: "address" },
+            { name: "vaultId", type: "uint256" }
+        ],
+        name: "getEncryptedSharesHandle",
+        outputs: [{ name: "", type: "bytes32" }],
         stateMutability: "view",
         type: "function"
     },
     {
-        inputs: [],
-        name: "GRACE_PERIOD",
+        inputs: [{ name: "user", type: "address" }],
+        name: "userVaultCount",
         outputs: [{ name: "", type: "uint256" }],
         stateMutability: "view",
         type: "function"
     },
     {
         inputs: [],
-        name: "claimByBeneficiary",
-        outputs: [],
-        stateMutability: "nonpayable",
+        name: "totalShares",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
         type: "function"
     },
     {
-        inputs: [{ name: "amount", type: "uint256" }],
-        name: "depositFromFactory",
-        outputs: [],
-        stateMutability: "nonpayable",
+        inputs: [],
+        name: "getTotalAssets",
+        outputs: [{ name: "", type: "uint256" }],
+        stateMutability: "view",
         type: "function"
+    },
+    {
+        inputs: [
+            { name: "user", type: "address" },
+            { name: "vaultId", type: "uint256" }
+        ],
+        name: "getVaultDetails",
+        outputs: [
+            { name: "unlockTimestamp", type: "uint256" },
+            { name: "penaltyBps", type: "uint256" },
+            { name: "purpose", type: "string" },
+            { name: "isActive", type: "bool" }
+        ],
+        stateMutability: "view",
+        type: "function"
+    },
+    {
+        anonymous: false,
+        inputs: [
+            { indexed: true, name: "user", type: "address" },
+            { indexed: true, name: "vaultId", type: "uint256" },
+            { indexed: false, name: "purpose", type: "string" }
+        ],
+        name: "VaultCreated",
+        type: "event"
+    },
+    {
+        anonymous: false,
+        inputs: [
+            { indexed: true, name: "user", type: "address" },
+            { indexed: true, name: "vaultId", type: "uint256" },
+            { indexed: false, name: "ctHandle", type: "bytes32" }
+        ],
+        name: "EncryptedSharesHandle",
+        type: "event"
     }
 ] as const;
 

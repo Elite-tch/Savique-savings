@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getSharedProofById, SharedProofConfig } from "@/lib/proofService";
 import { getReceiptsByWallet, Receipt } from "@/lib/receiptService";
-import { CONTRACTS, VAULT_ABI } from "@/lib/contracts";
+import { CONTRACTS, PRIVATE_SAVINGS_POOL_ABI } from "@/lib/contracts";
 import { createPublicClient, http } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 import Link from "next/link";
@@ -60,18 +60,19 @@ export default function VerifyProofPage() {
                 const uniqueVaults = Array.from(new Set(filtered.map(r => r.vaultAddress))).filter(Boolean) as string[];
                 const details: Record<string, any> = {};
                 
-                await Promise.all(uniqueVaults.map(async (addr) => {
+                await Promise.all(uniqueVaults.map(async (vaultIdStr) => {
                     try {
-                        const unlockTime = await publicClient.readContract({
-                            address: addr as `0x${string}`,
-                            abi: VAULT_ABI,
-                            functionName: 'unlockTimestamp',
+                        const vaultDetails = await publicClient.readContract({
+                            address: CONTRACTS.arbitrumSepolia.VaultFactory,
+                            abi: PRIVATE_SAVINGS_POOL_ABI,
+                            functionName: 'getVaultDetails',
+                            args: [config.walletAddress as `0x${string}`, BigInt(vaultIdStr)]
                         });
-                        details[addr] = {
-                            unlockTimestamp: Number(unlockTime) * 1000,
+                        details[vaultIdStr] = {
+                            unlockTimestamp: Number(vaultDetails[0]) * 1000,
                         };
                     } catch (e) {
-                        console.error(`Error fetching on-chain data for ${addr}:`, e);
+                        console.error(`Error fetching on-chain data for ${vaultIdStr}:`, e);
                     }
                 }));
                 setVaultDetails(details);
@@ -224,9 +225,9 @@ export default function VerifyProofPage() {
                                                     size="sm" 
                                                     variant="ghost" 
                                                     className="h-10 px-5 gap-2 text-primary hover:bg-primary/10 hover:text-primary font-bold text-xs rounded-xl border border-transparent hover:border-primary/20 transition-all"
-                                                    onClick={() => window.open(`https://sepolia.arbiscan.io/address/${addr}`, '_blank')}
+                                                    onClick={() => window.open(`https://sepolia.arbiscan.io/address/${CONTRACTS.arbitrumSepolia.VaultFactory}`, '_blank')}
                                                 >
-                                                    Explore
+                                                    Explore Pool
                                                     <ExternalLink className="w-3.5 h-3.5" />
                                                 </Button>
                                             </td>

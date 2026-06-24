@@ -20,6 +20,7 @@ import { http } from "viem";
 import { Toaster } from "sonner";
 import { AutoDisconnect } from "@/components/AutoDisconnect";
 import { arbitrum, arbitrumSepolia } from "viem/chains";
+import { FhenixProvider } from "@/lib/fhenixContext";
 
 const projectId = 'd76edd2ec72490269459a792d70e84fc';
 
@@ -83,11 +84,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                         overlayBlur: 'small',
                     })}
                 >
-                    <>
+                    <FhenixProvider>
                         <AutoDisconnect />
                         {children}
                         <Toaster position="top-right" theme="dark" richColors closeButton />
-                    </>
+                    </FhenixProvider>
                 </RainbowKitProvider>
             </QueryClientProvider>
         </WagmiProvider>

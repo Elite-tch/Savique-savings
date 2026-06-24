@@ -1,0 +1,27 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "Utils",
+  "sourceName": "@fhenixprotocol/cofhe-contracts/ICofhe.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "got",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "expected",
+          "type": "uint8"
+        }
+      ],
+      "name": "InvalidEncryptedInput",
+      "type": "error"
+    }
+  ],
+  "bytecode": "0x60808060405234601757603a9081601d823930815050f35b600080fdfe600080fdfea2646970667358221220ede8a5b957c833fef1c35e9e480748688bf14741c7765c4a519ada9b920f462064736f6c634300081b0033",
+  "deployedBytecode": "0x600080fdfea2646970667358221220ede8a5b957c833fef1c35e9e480748688bf14741c7765c4a519ada9b920f462064736f6c634300081b0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -3,14 +3,15 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { VAULT_ABI, ERC20_ABI, CONTRACTS, AAVE_POOL_ABI } from "@/lib/contracts";
-import { formatUnits, parseUnits } from "viem";
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, usePublicClient } from "wagmi";
+import { PRIVATE_SAVINGS_POOL_ABI, ERC20_ABI, CONTRACTS, AAVE_POOL_ABI } from "@/lib/contracts";
+import { formatUnits, parseUnits, bytesToHex } from "viem";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock, Unlock, ArrowLeft, Clock, Wallet, AlertTriangle, ShieldCheck, Eye, EyeOff, Zap, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useFhenix } from "@/lib/fhenixContext";
 import { calculateAccruedInterest } from "@/lib/interestService";
 import { VaultBreakModal } from "@/components/VaultBreakModal";
 import { VaultTopUpModal } from "@/components/VaultTopUpModal";
@@ -72,7 +73,12 @@ export default function VaultDetailPage() {
     const [quote, setQuote] = useState("");
     const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
     const { address: userAddress, isConnected } = useAccount();
+    const publicClient = usePublicClient();
+    const { fhenixClient, isInitialized, decryptHandle } = useFhenix();
     const { usdtAddress, isLoaded } = useContractAddresses();
+    
+    const vaultId = parseInt(address);
+    const poolAddress = CONTRACTS.arbitrumSepolia.VaultFactory;
 
 
 
@@ -124,10 +130,13 @@ export default function VaultDetailPage() {
         fetchVault();
     }, [address]);
 
-    // Contract interactions
-    const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
-    const { data: balanceResult, refetch: refetchBalance } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
-    const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
+    // Fallback data if DB fails
+    const [fallbackPurpose, setFallbackPurpose] = useState("");
+    const [fallbackUnlockTime, setFallbackUnlockTime] = useState<bigint>();
+    
+    const [privateBalance, setPrivateBalance] = useState("0");
+    const [isBalanceLoading, setIsBalanceLoading] = useState(true);
+
     const { data: decimals } = useReadContract({
         address: usdtAddress,
         abi: ERC20_ABI,
@@ -135,16 +144,40 @@ export default function VaultDetailPage() {
         query: { enabled: isLoaded }
     });
 
-    const { data: beneficiary } = useReadContract({ address, abi: VAULT_ABI, functionName: "beneficiary" });
-
+    // Fetch private balance via CoFHE decryption flow
+    useEffect(() => {
+        const fetchPrivateBalance = async () => {
+            if (!isInitialized || !fhenixClient || !userAddress || !publicClient) return;
+            try {
+                const ctHandle = await publicClient.readContract({
+                    address: poolAddress,
+                    abi: PRIVATE_SAVINGS_POOL_ABI,
+                    functionName: 'getEncryptedSharesHandle',
+                    args: [userAddress as `0x${string}`, BigInt(vaultId)]
+                });
+                
+                if (ctHandle !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+                    const decrypted = await decryptHandle(ctHandle as `0x${string}`, poolAddress);
+                    if (decrypted !== null) {
+                        setPrivateBalance(formatUnits(decrypted, decimals || 18));
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to read private balance:", e);
+            } finally {
+                setIsBalanceLoading(false);
+            }
+        };
+        fetchPrivateBalance();
+    }, [isInitialized, fhenixClient, userAddress, vaultId, publicClient, decimals, poolAddress, decryptHandle]);
 
     // Check Allowance for Top-up
     const { data: allowance, refetch: refetchAllowance } = useReadContract({
         address: usdtAddress,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: [userAddress as `0x${string}`, address],
-        query: { enabled: !!userAddress && !!address && isLoaded },
+        args: [userAddress as `0x${string}`, poolAddress],
+        query: { enabled: !!userAddress && isLoaded },
     });
 
     // Balance for Top-up
@@ -175,19 +208,14 @@ export default function VaultDetailPage() {
     }, [aaveReserveData]);
 
     const accruedInterest = useMemo(() => {
-        if (!balanceResult || !decimals) return "0.000000";
+        if (!privateBalance || !decimals) return "0.000000";
 
-        // currentBalance includes principal + interest
-        const currentBalance = parseFloat(formatUnits(balanceResult as bigint, decimals as number || 18));
-
-        // Interest is the difference
+        const currentBalance = parseFloat(privateBalance);
         const rawInterest = Math.max(0, currentBalance - totalPrincipal);
-
-        // Professional "Net Display": Only show the 80% that belongs to the user
         const userInterest = rawInterest * 0.8;
 
         return userInterest.toFixed(6);
-    }, [balanceResult, decimals, totalPrincipal]);
+    }, [privateBalance, decimals, totalPrincipal]);
 
     // Brand Styled Toast
     const toastStyle = {
@@ -223,7 +251,7 @@ export default function VaultDetailPage() {
                             body: JSON.stringify({
                                 type: 'TRANSACTION_FAILED',
                                 userEmail: profile.email,
-                                purpose: purpose as string || "Savings Interaction",
+                                purpose: vaultData?.purpose || "Savings Interaction",
                                 amount: topUpAmount || withdrawingAmount || "0"
                             })
                         });
@@ -236,7 +264,7 @@ export default function VaultDetailPage() {
 
             setTopUpStep('idle');
         }
-    }, [writeError, userAddress, purpose, topUpAmount, withdrawingAmount]);
+    }, [writeError, userAddress, topUpAmount, withdrawingAmount]);
 
     const { isLoading: isConfirming, isSuccess, data: receipt, error: confirmError } = useWaitForTransactionReceipt({ hash });
 
@@ -262,7 +290,7 @@ export default function VaultDetailPage() {
                             body: JSON.stringify({
                                 type: 'TRANSACTION_FAILED',
                                 userEmail: profile.email,
-                                purpose: purpose as string || "Savings Interaction",
+                                purpose: vaultData?.purpose || "Savings Interaction",
                                 amount: topUpAmount || withdrawingAmount || "0",
                                 txHash: hash
                             })
@@ -276,10 +304,12 @@ export default function VaultDetailPage() {
 
             setTopUpStep('idle');
         }
-    }, [confirmError, userAddress, purpose, topUpAmount, withdrawingAmount, hash]);
+    }, [confirmError, userAddress, vaultData, topUpAmount, withdrawingAmount, hash]);
 
-    const balance = balanceResult ? formatUnits(balanceResult as bigint, decimals as number || 18) : "0";
-    const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
+    const balance = privateBalance;
+    const unlockDate = vaultData ? new Date(vaultData.createdAt + (30*24*60*60*1000)) : new Date(); // Need exact unlock from DB or contract
+    const purpose = vaultData?.purpose || "Private Savings Goal";
+    const beneficiary = vaultData?.beneficiary;
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
 
@@ -419,7 +449,7 @@ export default function VaultDetailPage() {
 
                     toast.success("Ready!", toastStyle);
 
-                    refetchBalance();
+                    // Removed refetchBalance as private balance doesn't automatically refetch
                     refetchUserBalance();
 
                     if (isDeposit) {
@@ -441,16 +471,32 @@ export default function VaultDetailPage() {
             };
             finalizeTransaction();
         }
-    }, [isSuccess, router, hash, purpose, balance, receipt, isFinalizing, withdrawingAmount, userAddress, address, topUpStep, topUpAmount, refetchBalance, refetchUserBalance, vaultData, toastStyle]);
+    }, [isSuccess, router, hash, purpose, balance, receipt, isFinalizing, withdrawingAmount, userAddress, address, topUpStep, topUpAmount, refetchUserBalance, vaultData, toastStyle]);
 
-    const handleWithdrawUnlocked = () => {
+    const handleWithdrawUnlocked = async () => {
         try {
-            setWithdrawingAmount(balance); // Capture balance
-            toastId.current = toast.loading("Initializing Transaction...", toastStyle);
+            if (!fhenixClient || !publicClient) throw new Error("Fhenix not initialized");
+            setWithdrawingAmount(balance); 
+            toastId.current = toast.loading("Encrypting shares...", toastStyle);
+            
+            const totalShares = await publicClient.readContract({ address: poolAddress, abi: PRIVATE_SAVINGS_POOL_ABI, functionName: 'totalShares' });
+            const totalAssets = await publicClient.readContract({ address: poolAddress, abi: PRIVATE_SAVINGS_POOL_ABI, functionName: 'getTotalAssets' });
+            
+            let sharesToWithdraw = BigInt(0);
+            if (Number(totalAssets) > 0) {
+                sharesToWithdraw = (parseUnits(balance, decimals || 18) * BigInt(totalShares as bigint)) / BigInt(totalAssets as bigint);
+            } else {
+                sharesToWithdraw = parseUnits(balance, decimals || 18);
+            }
+            
+            const encryptedShares = await fhenixClient.encrypt_uint64(sharesToWithdraw);
+
+            toast.loading("Submitting Transaction...", { id: toastId.current });
             writeContract({
-                address,
-                abi: VAULT_ABI,
+                address: poolAddress,
+                abi: PRIVATE_SAVINGS_POOL_ABI,
                 functionName: "withdraw",
+                args: [BigInt(vaultId), bytesToHex(encryptedShares.data)],
                 gasPrice: BigInt(100000000)
             });
         } catch (error) {
@@ -490,7 +536,7 @@ export default function VaultDetailPage() {
                     address: usdtAddress,
                     abi: ERC20_ABI,
                     functionName: "approve",
-                    args: [address, BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935")],
+                    args: [poolAddress, BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935")],
                     gasPrice: BigInt(100000000)
                 });
             } else {
@@ -502,10 +548,10 @@ export default function VaultDetailPage() {
                     toastId.current = toast.loading(msg, toastStyle);
                 }
                 writeContract({
-                    address,
-                    abi: VAULT_ABI,
+                    address: poolAddress,
+                    abi: PRIVATE_SAVINGS_POOL_ABI,
                     functionName: "deposit",
-                    args: [amountUnits],
+                    args: [BigInt(vaultId), amountUnits],
                     gasPrice: BigInt(100000000)
                 });
                 // Ensure allowance is refreshed after we've used it

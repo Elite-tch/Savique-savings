@@ -39,7 +39,9 @@ const KNOWN_FACTORIES = [
     "0xC78178AbdFC385E6dD1E4e8304545741e44B92d3", // V5 (Fixed JSON)
     "0x0484780F5aA1EbD7bD7e6C4c72ADFDA2c0c9D57A", // V6 (OpenZeppelin Standard)
     "0x85856bFecBe6d46863e2B11A22c1aD58B74A2Ab1", // V7 (Tiered Rewards)
-    "0x059652D26C7653278896D3DF7286EAaDE7a60b15"  // V8 (Non-NFT)
+    "0x059652D26C7653278896D3DF7286EAaDE7a60b15", // V8 (Non-NFT)
+    "0x148fAa1Ff4219487635d6BC10d81F14c316B3d5B",  // Fhenix Private Pool (v1 - old)
+    "0xE142f08E04B963f22397eE36b8BcE184c05c0875"   // Fhenix CoFHE Pool (v2 - current)
 ].map(a => a.toLowerCase());
 
 function isSameNetwork(fact1: string, fact2: string) {
@@ -206,6 +208,7 @@ export interface SavedVault {
     createdAt: number;
     purpose?: string;
     targetAmount?: string; // New: Sinking Fund Goal
+    currentTotal?: number;
     beneficiary?: string; // Emergency Beneficiary
 }
 
@@ -364,7 +367,8 @@ export async function getAllVaults(factoryAddress?: string): Promise<SavedVault[
                 owner: data.owner,
                 factoryAddress: data.factoryAddress,
                 createdAt: created || Date.now(),
-                purpose: data.purpose
+                purpose: data.purpose,
+                currentTotal: data.currentTotal
             });
         });
 

@@ -2,14 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, TrendingDown, X, Lock, Unlock } from "lucide-react";
-import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { VAULT_ABI } from "@/lib/contracts";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount, usePublicClient } from "wagmi";
+import { PRIVATE_SAVINGS_POOL_ABI } from "@/lib/contracts";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { saveReceipt } from "@/lib/receiptService";
 import { createNotification } from "@/lib/notificationService";
 import { getUserProfile } from "@/lib/userService";
+import { useFhenix } from "@/lib/fhenixContext";
+import { parseUnits } from "viem";
 
 interface VaultBreakModalProps {
     isOpen: boolean;
@@ -41,6 +43,8 @@ export function VaultBreakModal({
 
     const router = useRouter();
     const { address: userAddress } = useAccount();
+    const publicClient = usePublicClient();
+    const { fhenixClient } = useFhenix();
     const { writeContract, data: hash, isPending: isWritePending, error: writeError } = useWriteContract();
     const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash });
 
@@ -49,13 +53,32 @@ export function VaultBreakModal({
     // Toast control
     const toastId = useRef<string | number | null>(null);
 
-    const handleWithdraw = () => {
+    const handleWithdraw = async () => {
         try {
-            toastId.current = toast.loading("Initializing Transaction...", toastStyle);
+            if (!fhenixClient || !publicClient) throw new Error("Fhenix not initialized");
+            toastId.current = toast.loading("Encrypting shares...", toastStyle);
+            
+            const poolAddress = CONTRACTS.arbitrumSepolia.VaultFactory;
+            const totalShares = await publicClient.readContract({ address: poolAddress, abi: PRIVATE_SAVINGS_POOL_ABI, functionName: 'totalShares' });
+            const totalAssets = await publicClient.readContract({ address: poolAddress, abi: PRIVATE_SAVINGS_POOL_ABI, functionName: 'getTotalAssets' });
+            
+            let sharesToWithdraw = BigInt(0);
+            if (Number(totalAssets) > 0) {
+                sharesToWithdraw = (parseUnits(balance, 18) * BigInt(totalShares as bigint)) / BigInt(totalAssets as bigint);
+            } else {
+                sharesToWithdraw = parseUnits(balance, 18);
+            }
+            
+            const encryptedShares = await fhenixClient.encrypt_uint64(sharesToWithdraw);
+
+            const { bytesToHex } = await import('viem');
+
+            toast.loading("Submitting Transaction...", { id: toastId.current });
             writeContract({
-                address,
-                abi: VAULT_ABI,
+                address: poolAddress,
+                abi: PRIVATE_SAVINGS_POOL_ABI,
                 functionName: "withdraw",
+                args: [BigInt(address), bytesToHex(encryptedShares.data)], // address is vaultId here
                 gasPrice: BigInt(100000000)
             });
         } catch (error) {

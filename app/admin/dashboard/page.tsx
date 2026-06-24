@@ -18,7 +18,7 @@ import {
     ExternalLink
 } from "lucide-react";
 import { usePublicClient } from "wagmi";
-import { VAULT_ABI, CONTRACTS } from "@/lib/contracts";
+import { PRIVATE_SAVINGS_POOL_ABI, CONTRACTS } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -64,27 +64,17 @@ export default function AdminDashboard() {
             setReceipts(allReceipts);
 
             if (publicClient) {
-                let currentTvl = 0;
-                const chunkSize = 20;
-                for (let i = 0; i < allVaults.length; i += chunkSize) {
-                    const chunk = allVaults.slice(i, i + chunkSize);
-                    const balances = await Promise.all(
-                        chunk.map(async (v) => {
-                            try {
-                                const bal = await publicClient.readContract({
-                                    address: v.vaultAddress as `0x${string}`,
-                                    abi: VAULT_ABI,
-                                    functionName: 'totalAssets'
-                                }) as bigint;
-                                return parseFloat(formatUnits(bal, 6));
-                            } catch (e) {
-                                return 0;
-                            }
-                        })
-                    );
-                    currentTvl += balances.reduce((a, b) => a + b, 0);
+                try {
+                    const totalAssets = await publicClient.readContract({
+                        address: CONTRACTS.arbitrumSepolia.VaultFactory,
+                        abi: PRIVATE_SAVINGS_POOL_ABI,
+                        functionName: 'getTotalAssets'
+                    }) as bigint;
+                    setTvl(parseFloat(formatUnits(totalAssets, 6)));
+                } catch (e) {
+                    console.error("Failed to read getTotalAssets", e);
+                    setTvl(0);
                 }
-                setTvl(currentTvl);
             }
         } catch (error) {
             console.error("Admin Load Error", error);

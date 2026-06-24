@@ -5,7 +5,7 @@ import { sendNotificationEmail, EmailType } from '@/lib/emailService';
 import { getUserProfile } from '@/lib/userService';
 import { createPublicClient, http } from 'viem';
 import { arbitrumSepolia } from 'viem/chains';
-import { VAULT_ABI, VAULT_FACTORY_ABI, CONTRACTS } from '@/lib/contracts';
+import { PRIVATE_SAVINGS_POOL_ABI, CONTRACTS } from '@/lib/contracts';
 import { getUserVaultsFromDb } from '@/lib/receiptService';
 
 // Secret key to protect the cron endpoint (set in Vercel env vars)
@@ -69,19 +69,17 @@ export async function GET(req: NextRequest) {
                 stats.usersChecked++;
 
                 // Get user's vaults from factory contract
-                let vaults: readonly `0x${string}`[] = [];
+                let vaults: string[] = [];
                 try {
-                    // Try to get from DB first as it's faster
-                    vaults = await getUserVaultsFromDb(walletAddress) as `0x${string}`[];
-
-                    // Fallback to contract if DB is empty (rare but possible)
-                    if (!vaults || vaults.length === 0) {
-                        vaults = await publicClient.readContract({
-                            address: CONTRACTS.arbitrumSepolia.VaultFactory,
-                            abi: VAULT_FACTORY_ABI,
-                            functionName: 'getUserVaults',
-                            args: [walletAddress as `0x${string}`]
-                        }) as readonly `0x${string}`[];
+                    const count = await publicClient.readContract({
+                        address: CONTRACTS.arbitrumSepolia.VaultFactory,
+                        abi: PRIVATE_SAVINGS_POOL_ABI,
+                        functionName: 'userVaultCount',
+                        args: [walletAddress as `0x${string}`]
+                    });
+                    
+                    for(let i = 0; i < Number(count); i++) {
+                        vaults.push(i.toString());
                     }
                 } catch (e) {
                     console.warn(`[CronReminders] Failed to get vaults for ${walletAddress.slice(0, 10)}:`, e);
@@ -93,34 +91,24 @@ export async function GET(req: NextRequest) {
                 }
 
                 // Check each vault
-                for (const vaultAddress of vaults) {
+                for (const vaultId of vaults) {
                     try {
                         stats.vaultsChecked++;
 
                         // Get vault data from blockchain
-                        const [unlockTime, balance, purpose] = await Promise.all([
-                            publicClient.readContract({
-                                address: vaultAddress,
-                                abi: VAULT_ABI,
-                                functionName: 'unlockTimestamp'
-                            }),
-                            publicClient.readContract({
-                                address: vaultAddress,
-                                abi: VAULT_ABI,
-                                functionName: 'totalAssets'
-                            }),
-                            publicClient.readContract({
-                                address: vaultAddress,
-                                abi: VAULT_ABI,
-                                functionName: 'purpose'
-                            })
-                        ]);
+                        const vaultDetails = await publicClient.readContract({
+                            address: CONTRACTS.arbitrumSepolia.VaultFactory,
+                            abi: PRIVATE_SAVINGS_POOL_ABI,
+                            functionName: 'getVaultDetails',
+                            args: [walletAddress as `0x${string}`, BigInt(vaultId)]
+                        });
 
-                        const unlockTimestamp = Number(unlockTime) * 1000;
-                        const balanceNum = Number(balance) / 1e6; // USDC has 6 decimals
+                        const unlockTimestamp = Number(vaultDetails[0]) * 1000;
+                        const purpose = vaultDetails[2];
+                        const isActive = vaultDetails[3];
 
-                        // Skip if already unlocked or empty
-                        if (unlockTimestamp <= now || balanceNum <= 0) {
+                        // Skip if already unlocked or inactive
+                        if (unlockTimestamp <= now || !isActive) {
                             continue;
                         }
 
@@ -138,7 +126,7 @@ export async function GET(req: NextRequest) {
                             await sendNotificationEmail('MATURITY_COUNTDOWN', {
                                 userEmail: profile.email,
                                 purpose: purpose as string || 'Your Savings',
-                                amount: balanceNum.toFixed(2),
+                                amount: "Private", // FHE hides balance without permit
                                 unlockDate: unlockDateStr,
                                 daysRemaining: daysRemaining
                             });
@@ -151,8 +139,8 @@ export async function GET(req: NextRequest) {
                             await sendNotificationEmail('GOAL_REMINDER', {
                                 userEmail: profile.email,
                                 purpose: purpose as string || 'Your Savings',
-                                currentBalance: balanceNum.toFixed(2),
-                                amount: balanceNum.toFixed(2),
+                                currentBalance: "Private",
+                                amount: "Private",
                                 unlockDate: unlockDateStr,
                                 daysRemaining: daysRemaining
                             });
@@ -164,7 +152,7 @@ export async function GET(req: NextRequest) {
                         await new Promise(resolve => setTimeout(resolve, 100));
 
                     } catch (vaultError) {
-                        console.warn(`[CronReminders] Error processing vault ${vaultAddress.slice(0, 10)}:`, vaultError);
+                        console.warn(`[CronReminders] Error processing vault ${vaultId}:`, vaultError);
                         stats.errors++;
                     }
                 }

@@ -7,11 +7,12 @@ import { Plus, Lock, Unlock, Search, Wallet, Clock, AlertTriangle, Calendar, Eye
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { useAccount, useReadContract } from "wagmi";
-import { CONTRACTS, VAULT_FACTORY_ABI, VAULT_ABI, ERC20_ABI } from "@/lib/contracts";
+import { CONTRACTS, PRIVATE_SAVINGS_POOL_ABI, ERC20_ABI } from "@/lib/contracts";
 import { formatUnits } from "viem";
 import { motion } from "framer-motion";
 import { getReceiptsByWallet, Receipt, getUserVaultsFromDb, saveVault, getVaultByAddress, SavedVault } from "@/lib/receiptService";
 import { usePublicClient } from "wagmi";
+import { useFhenix } from "@/lib/fhenixContext";
 import { Progress } from "@/components/ui/progress";
 import { Suspense, useMemo } from "react";
 import { ChevronLeft, ChevronRight, FileText, CheckCircle2, History } from "lucide-react";
@@ -120,40 +121,79 @@ function CompletedVaultCard({
     );
 }
 
-// Keep the original VaultCard but update it for integration
-function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: string }) {
-    const { data: purpose } = useReadContract({ address, abi: VAULT_ABI, functionName: "purpose" });
-    const { data: decimals } = useReadContract({ address: CONTRACTS.arbitrumSepolia.USDCToken, abi: ERC20_ABI, functionName: 'decimals' });
-    const { data: balanceResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "totalAssets" });
-    const { data: unlockTimeResult } = useReadContract({ address, abi: VAULT_ABI, functionName: "unlockTimestamp" });
+// Keep the original VaultCard but update it for FHE shared pool integration
+function VaultCard({ vaultId, activeTab }: { vaultId: string, activeTab: string }) {
+    const { address: userAddress } = useAccount();
+    const publicClient = usePublicClient();
+    const { fhenixClient, isInitialized, decryptHandle } = useFhenix();
 
+    const poolAddress = CONTRACTS.arbitrumSepolia.VaultFactory;
+    const { data: decimals } = useReadContract({ address: CONTRACTS.arbitrumSepolia.USDCToken, abi: ERC20_ABI, functionName: 'decimals' });
+    
+    const { data: vaultDetails } = useReadContract({ 
+        address: poolAddress, 
+        abi: PRIVATE_SAVINGS_POOL_ABI, 
+        functionName: "getVaultDetails",
+        args: [userAddress as `0x${string}`, BigInt(vaultId)],
+        query: { enabled: !!userAddress }
+    });
+
+    const purpose = vaultDetails?.[2];
+    const unlockTimeResult = vaultDetails?.[0];
+
+    const [privateBalance, setPrivateBalance] = useState<string>("0");
     const [creationDate, setCreationDate] = useState<Date | null>(null);
     const [vaultData, setVaultData] = useState<SavedVault | null>(null);
-    const { address: userAddress } = useAccount();
 
-    const balance = balanceResult ? formatUnits(balanceResult, decimals || 18) : "0";
+    // Fetch private balance via CoFHE decryption flow
+    useEffect(() => {
+        const fetchPrivateBalance = async () => {
+            if (!isInitialized || !fhenixClient || !userAddress || !publicClient) return;
+            try {
+                const ctHandle = await publicClient.readContract({
+                    address: poolAddress,
+                    abi: PRIVATE_SAVINGS_POOL_ABI,
+                    functionName: 'getEncryptedSharesHandle',
+                    args: [userAddress as `0x${string}`, BigInt(vaultId)]
+                });
+                
+                if (ctHandle !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+                    const decrypted = await decryptHandle(ctHandle as `0x${string}`, poolAddress);
+                    if (decrypted !== null) {
+                         setPrivateBalance(formatUnits(decrypted, decimals || 18));
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to read private balance:", e);
+            }
+        };
+        fetchPrivateBalance();
+    }, [isInitialized, fhenixClient, userAddress, vaultId, publicClient, decimals, poolAddress, decryptHandle]);
+
+    const balance = privateBalance;
     const unlockDate = unlockTimeResult ? new Date(Number(unlockTimeResult) * 1000) : new Date();
     const isLocked = new Date() < unlockDate;
     const countdown = useCountdown(unlockDate);
 
     useEffect(() => {
         const fetchVaultData = async () => {
-            const data = await getVaultByAddress(address);
+            // In the DB, the vault address is stored as the vaultId string
+            const data = await getVaultByAddress(vaultId);
             setVaultData(data);
             if (data?.createdAt) {
                 setCreationDate(new Date(data.createdAt));
             }
         };
         fetchVaultData();
-    }, [address]);
+    }, [vaultId]);
 
     const progressValue = useMemo(() => {
-        if (!vaultData?.targetAmount || !balanceResult || !decimals) return 0;
-        const current = parseFloat(formatUnits(balanceResult as bigint, decimals as number || 18));
+        if (!vaultData?.targetAmount || !privateBalance) return 0;
+        const current = parseFloat(privateBalance);
         const target = parseFloat(vaultData.targetAmount);
         if (target === 0) return 100;
         return Math.min(100, (current / target) * 100);
-    }, [vaultData, balanceResult, decimals]);
+    }, [vaultData, privateBalance]);
 
     // Format countdown parts
     const formatCountdown = () => {
@@ -168,7 +208,7 @@ function VaultCard({ address, activeTab }: { address: `0x${string}`, activeTab: 
 
     return (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Link href={`/dashboard/savings/${address}?tab=${activeTab}`}>
+            <Link href={`/dashboard/savings/${vaultId}?tab=${activeTab}`}>
                 <Card className="bg-zinc-900/40 border-zinc-800/50 hover:border-zinc-700 transition-all cursor-pointer group h-full">
                     <div className="p-4 space-y-4">
                         <div className="flex justify-between items-center">
@@ -258,11 +298,12 @@ function SavingsDashboard() {
     const [isLoading, setIsLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [rawVaults, setRawVaults] = useState<{
-        vaddr: `0x${string}`,
-        balanceResult: bigint,
+        vaddr: string, // now representing vaultId
+        balanceResult: string,
         unlockResult: bigint
     }[]>([]);
     const [completedHistory, setCompletedHistory] = useState<{ vault: SavedVault, receipt?: Receipt }[]>([]);
+    const { fhenixClient, isInitialized, decryptHandle } = useFhenix();
 
     // Automatically update time every 10s to move cards between tabs reactively
     useEffect(() => {
@@ -272,60 +313,64 @@ function SavingsDashboard() {
 
     useEffect(() => {
         const loadAndCategorizeVaults = async () => {
-            if (!address || !publicClient) return;
+            if (!address || !publicClient || !isInitialized || !fhenixClient) return;
             setIsLoading(true);
             try {
-                // 1. Get unique vault addresses from DB and Chain in parallel
-                const [dbVaults, rawChainVaults] = await Promise.all([
-                    getUserVaultsFromDb(address, CONTRACTS.arbitrumSepolia.VaultFactory),
-                    publicClient.readContract({
-                        address: CONTRACTS.arbitrumSepolia.VaultFactory,
-                        abi: VAULT_FACTORY_ABI,
-                        functionName: "getUserVaults",
-                        args: [address]
-                    })
-                ]);
-
-                const chainVaults = [...(rawChainVaults as string[])].reverse();
-
-                const uniqueAddresses = Array.from(new Set([
-                    ...chainVaults.map(a => a.toLowerCase()),
-                    ...dbVaults.map(a => a.toLowerCase())
-                ])) as `0x${string}`[];
-
-                if (uniqueAddresses.length === 0) {
+                const poolAddress = CONTRACTS.arbitrumSepolia.VaultFactory;
+                
+                // 1. Get userVaultCount
+                const vaultCountResult = await publicClient.readContract({
+                    address: poolAddress,
+                    abi: PRIVATE_SAVINGS_POOL_ABI,
+                    functionName: "userVaultCount",
+                    args: [address]
+                });
+                
+                const count = Number(vaultCountResult);
+                if (count === 0) {
                     setRawVaults([]);
                     setCompletedHistory([]);
                     return;
                 }
 
-                // 2. Fetch balance and status for each to categorize in parallel
-                // Note: Promise.all is used because Coston2 doesn't have multicall3 configured in viem
-                // but wagmiConfig transport handles batching naturally.
-                const results = await Promise.all(uniqueAddresses.map(async (vaddr) => {
-                    try {
-                        // Check if the code exists at this address
-                        const code = await publicClient.getBytecode({ address: vaddr });
-                        if (!code || code === '0x') {
-                            console.warn(`[Vault] No contract found at address ${vaddr} on this network. Skipping...`);
-                            return null;
-                        }
+                const uniqueAddresses = Array.from({ length: count }, (_, i) => i.toString());
 
-                        const [balanceResult, unlockResult] = await Promise.all([
+                // 2. Fetch balance and status for each using CoFHE
+                const results = await Promise.all(uniqueAddresses.map(async (vaultIdStr) => {
+                    try {
+                        const vaultId = BigInt(vaultIdStr);
+                        
+                        const [vaultDetails, ctHandle] = await Promise.all([
                             publicClient.readContract({
-                                address: vaddr,
-                                abi: VAULT_ABI,
-                                functionName: "totalAssets"
+                                address: poolAddress,
+                                abi: PRIVATE_SAVINGS_POOL_ABI,
+                                functionName: "getVaultDetails",
+                                args: [address as `0x${string}`, vaultId]
                             }),
                             publicClient.readContract({
-                                address: vaddr,
-                                abi: VAULT_ABI,
-                                functionName: "unlockTimestamp"
+                                address: poolAddress,
+                                abi: PRIVATE_SAVINGS_POOL_ABI,
+                                functionName: 'getEncryptedSharesHandle',
+                                args: [address as `0x${string}`, vaultId]
                             })
                         ]);
-                        return { vaddr, balanceResult, unlockResult };
+                        
+                        const isActive = vaultDetails[3];
+                        if (!isActive) return null; // Ignore inactive
+                        
+                        let bal = 0n;
+                        if (ctHandle !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+                             const decrypted = await decryptHandle(ctHandle as `0x${string}`, poolAddress);
+                             if (decrypted !== null) bal = decrypted;
+                        }
+                        
+                        return { 
+                            vaddr: vaultIdStr, 
+                            balanceResult: formatUnits(bal as bigint, 18), // Use 18 as default for simplification, we only check if > 0
+                            unlockResult: vaultDetails[0] as bigint
+                        };
                     } catch (e) {
-                        console.error(`Error checking vault ${vaddr}:`, e);
+                        console.error(`Error checking vault ${vaultIdStr}:`, e);
                         return null;
                     }
                 }));
@@ -335,12 +380,12 @@ function SavingsDashboard() {
 
                 // 3. Identification of completed (zero balance) vaults for Withdrawal tab
                 const completedAddresses = validResults
-                    .filter(res => parseFloat(formatUnits(res.balanceResult, 6)) === 0)
+                    .filter(res => parseFloat(res.balanceResult) === 0)
                     .map(res => res.vaddr);
 
                 // Parallel fetch metadata and receipts for completed vaults
                 const [allReceipts, ...allMetadataResults] = await Promise.all([
-                    getReceiptsByWallet(address, CONTRACTS.arbitrumSepolia.VaultFactory),
+                    getReceiptsByWallet(address, poolAddress),
                     ...completedAddresses.map(vaddr => getVaultByAddress(vaddr))
                 ]);
 
@@ -366,7 +411,7 @@ function SavingsDashboard() {
         };
 
         loadAndCategorizeVaults();
-    }, [address, publicClient]);
+    }, [address, publicClient, fhenixClient, isInitialized]);
 
     // Categorize vaults reactively based on current time
     const allVaultsData = useMemo(() => {
@@ -374,7 +419,7 @@ function SavingsDashboard() {
         const matured: string[] = [];
 
         rawVaults.forEach(res => {
-            const bal = parseFloat(formatUnits(res.balanceResult, 18));
+            const bal = parseFloat(res.balanceResult);
             const unlockTime = Number(res.unlockResult) * 1000;
             const isMatured = currentTime >= unlockTime;
 
@@ -473,8 +518,8 @@ function SavingsDashboard() {
                                 ? (currentItems as { vault: SavedVault, receipt?: Receipt }[]).map((item) => (
                                     <CompletedVaultCard key={item.vault.vaultAddress} vault={item.vault} receipt={item.receipt} activeTab={activeTab} />
                                 ))
-                                : (currentItems as string[]).map((addr) => (
-                                    <VaultCard key={addr} address={addr as `0x${string}`} activeTab={activeTab} />
+                                : (currentItems as string[]).map((vaultId) => (
+                                    <VaultCard key={vaultId} vaultId={vaultId} activeTab={activeTab} />
                                 ))
                             }
                         </div>
